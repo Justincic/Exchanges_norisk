@@ -1,6 +1,7 @@
 import type { ExchangeId, FundingMarket, FundingOpportunity, QuoteAsset } from './types';
 
 const STABLE_QUOTES = ['USDT', 'USDC', 'USD'] as const;
+const LOW_LIQUIDITY_USD = 5_000_000;
 const BASE_ALIASES: Record<string, string> = {
   CL: 'WTI',
   WTIOIL: 'WTI',
@@ -69,6 +70,10 @@ export function createFundingMarket(input: {
   nextFundingTime: number | null;
   intervalHours?: number;
   sourceUpdatedAt?: number;
+  markPrice?: number | null;
+  indexPrice?: number | null;
+  openInterestUsd?: number | null;
+  volume24hUsd?: number | null;
 }): FundingMarket {
   const intervalHours = input.intervalHours ?? inferIntervalHours(input.nextFundingTime);
   const baseSymbol = input.baseSymbol ?? normalizeBaseSymbol(input.marketSymbol);
@@ -82,7 +87,12 @@ export function createFundingMarket(input: {
     nextFundingTime: input.nextFundingTime,
     intervalHours,
     annualizedRate: annualizeFundingRate(input.fundingRate, intervalHours),
-    sourceUpdatedAt: input.sourceUpdatedAt ?? Date.now()
+    sourceUpdatedAt: input.sourceUpdatedAt ?? Date.now(),
+    markPrice: normalizeNullableNumber(input.markPrice),
+    indexPrice: normalizeNullableNumber(input.indexPrice),
+    openInterestUsd: normalizeNullableNumber(input.openInterestUsd),
+    volume24hUsd: normalizeNullableNumber(input.volume24hUsd),
+    liquidityScoreUsd: getLiquidityScore(input.openInterestUsd, input.volume24hUsd)
   };
 }
 
@@ -107,6 +117,9 @@ export function buildOpportunities(markets: FundingMarket[]): FundingOpportunity
       const spreadPerPeriod =
         longMarket && shortMarket ? spreadAnnualized / (365 * 3) : 0;
       const nextFundingTime = getNearestFundingTime(group);
+      const settlementTimeDiffMs = getSettlementTimeDiffMs(longMarket, shortMarket);
+      const priceSpreadPct = getPriceSpreadPct(longMarket, shortMarket);
+      const minLiquidityUsd = getMinLiquidityUsd(longMarket, shortMarket);
       const quoteSet = new Set(group.map((market) => market.quoteAsset).filter((quote) => quote !== 'UNKNOWN'));
 
       return {
@@ -118,7 +131,12 @@ export function buildOpportunities(markets: FundingMarket[]): FundingOpportunity
         spreadPerPeriod,
         nextFundingTime,
         hasMixedQuotes: quoteSet.size > 1,
-        isCrossExchange: Boolean(longMarket && shortMarket && longMarket.exchange !== shortMarket.exchange)
+        isCrossExchange: Boolean(longMarket && shortMarket && longMarket.exchange !== shortMarket.exchange),
+        settlementTimeDiffMs,
+        isSettlementAligned: settlementTimeDiffMs !== null && settlementTimeDiffMs <= 15 * 60_000,
+        priceSpreadPct,
+        minLiquidityUsd,
+        hasLiquidityWarning: minLiquidityUsd !== null && minLiquidityUsd < LOW_LIQUIDITY_USD
       };
     })
     .sort((a, b) => b.spreadAnnualized - a.spreadAnnualized);
@@ -160,6 +178,23 @@ function getNearestFundingTime(markets: FundingMarket[]): number | null {
   return times.length ? Math.min(...times) : null;
 }
 
+function getSettlementTimeDiffMs(longMarket: FundingMarket | null, shortMarket: FundingMarket | null): number | null {
+  if (!longMarket?.nextFundingTime || !shortMarket?.nextFundingTime) return null;
+  return Math.abs(shortMarket.nextFundingTime - longMarket.nextFundingTime);
+}
+
+function getPriceSpreadPct(longMarket: FundingMarket | null, shortMarket: FundingMarket | null): number | null {
+  if (!longMarket?.markPrice || !shortMarket?.markPrice || longMarket.markPrice <= 0) return null;
+  return (shortMarket.markPrice - longMarket.markPrice) / longMarket.markPrice;
+}
+
+function getMinLiquidityUsd(longMarket: FundingMarket | null, shortMarket: FundingMarket | null): number | null {
+  const values = [longMarket?.liquidityScoreUsd, shortMarket?.liquidityScoreUsd].filter(
+    (value): value is number => typeof value === 'number' && Number.isFinite(value)
+  );
+  return values.length ? Math.min(...values) : null;
+}
+
 function sortMarketsForDisplay(markets: FundingMarket[]) {
   const order: ExchangeId[] = ['HL', 'OKX', 'BN'];
   return [...markets].sort((a, b) => {
@@ -187,4 +222,15 @@ function findBestPair(markets: FundingMarket[]) {
 
 function canonicalizeBaseSymbol(baseSymbol: string): string {
   return BASE_ALIASES[baseSymbol] ?? baseSymbol;
+}
+
+function normalizeNullableNumber(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function getLiquidityScore(openInterestUsd: number | null | undefined, volume24hUsd: number | null | undefined) {
+  const values = [openInterestUsd, volume24hUsd].filter(
+    (value): value is number => typeof value === 'number' && Number.isFinite(value)
+  );
+  return values.length ? Math.max(...values) : null;
 }

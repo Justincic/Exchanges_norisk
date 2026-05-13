@@ -11,6 +11,11 @@ export type FundingMarket = {
   intervalHours: number;
   annualizedRate: number;
   sourceUpdatedAt: number;
+  markPrice: number | null;
+  indexPrice: number | null;
+  openInterestUsd: number | null;
+  volume24hUsd: number | null;
+  liquidityScoreUsd: number | null;
 };
 
 export type FundingOpportunity = {
@@ -23,6 +28,11 @@ export type FundingOpportunity = {
   nextFundingTime: number | null;
   hasMixedQuotes: boolean;
   isCrossExchange: boolean;
+  settlementTimeDiffMs: number | null;
+  isSettlementAligned: boolean;
+  priceSpreadPct: number | null;
+  minLiquidityUsd: number | null;
+  hasLiquidityWarning: boolean;
 };
 
 export type ExchangeHealth = {

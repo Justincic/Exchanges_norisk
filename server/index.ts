@@ -10,8 +10,8 @@ const CACHE_TTL_MS = 60_000;
 let snapshotCache: FundingSnapshot | null = null;
 let pendingRefresh: Promise<FundingSnapshot> | null = null;
 
-app.get('/api/health', async (_request, response) => {
-  const snapshot = await getSnapshot();
+app.get('/api/health', async (request, response) => {
+  const snapshot = await getSnapshot(request.query.refresh === '1');
   response.json({
     generatedAt: snapshot.generatedAt,
     cacheExpiresAt: snapshot.cacheExpiresAt,
@@ -19,8 +19,8 @@ app.get('/api/health', async (_request, response) => {
   });
 });
 
-app.get('/api/funding/snapshot', async (_request, response) => {
-  const snapshot = await getSnapshot();
+app.get('/api/funding/snapshot', async (request, response) => {
+  const snapshot = await getSnapshot(request.query.refresh === '1');
   response.json(snapshot);
 });
 
@@ -28,9 +28,9 @@ app.listen(port, () => {
   console.log(`Funding aggregator listening on http://localhost:${port}`);
 });
 
-async function getSnapshot(): Promise<FundingSnapshot> {
+async function getSnapshot(forceRefresh = false): Promise<FundingSnapshot> {
   const now = Date.now();
-  if (snapshotCache && snapshotCache.cacheExpiresAt > now) {
+  if (!forceRefresh && snapshotCache && snapshotCache.cacheExpiresAt > now) {
     return snapshotCache;
   }
 

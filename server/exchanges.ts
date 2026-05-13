@@ -37,33 +37,36 @@ export async function fetchHyperliquidMarkets(): Promise<ExchangeFetchResult> {
 
 async function fetchHyperliquidCoreMarkets(sourceUpdatedAt: number): Promise<FundingMarket[]> {
   const exchange: ExchangeId = 'HL';
-  const data = await fetchJson<HyperliquidPredictedFunding[]>('https://api.hyperliquid.xyz/info', {
+  const [meta, contexts] = await fetchJson<HyperliquidMetaAndAssetCtxs>('https://api.hyperliquid.xyz/info', {
     method: 'POST',
     headers: JSON_HEADERS,
-    body: JSON.stringify({ type: 'predictedFundings' })
+    body: JSON.stringify({ type: 'metaAndAssetCtxs' })
   });
 
-  const markets: FundingMarket[] = [];
-  for (const [coin, venues] of data) {
-    for (const [venue, venueFunding] of venues) {
-      if (venue !== 'HlPerp') continue;
-      const fundingRate = Number(venueFunding.fundingRate);
-      if (!Number.isFinite(fundingRate)) continue;
+  return meta.universe
+    .map((asset, index) => {
+      const context = contexts[index];
+      const fundingRate = Number(context?.funding);
+      if (!Number.isFinite(fundingRate)) return null;
+      const markPrice = Number(context?.markPx);
+      const openInterest = Number(context?.openInterest);
+      const dayNtlVlm = Number(context?.dayNtlVlm);
 
-      markets.push(
-        createFundingMarket({
-          baseSymbol: normalizeBaseSymbol(coin),
-          marketSymbol: `${coin.toUpperCase()}-USD`,
-          exchange,
-          fundingRate,
-          nextFundingTime: Number(venueFunding.nextFundingTime) || null,
-          intervalHours: 1,
-          sourceUpdatedAt
-        })
-      );
-    }
-  }
-  return markets;
+      return createFundingMarket({
+        baseSymbol: normalizeBaseSymbol(asset.name),
+        marketSymbol: `${asset.name.toUpperCase()}-USD`,
+        exchange,
+        fundingRate,
+        nextFundingTime: nextHourlyFundingTime(sourceUpdatedAt),
+        intervalHours: 1,
+        markPrice,
+        indexPrice: Number(context?.oraclePx),
+        openInterestUsd: Number.isFinite(openInterest * markPrice) ? openInterest * markPrice : null,
+        volume24hUsd: Number.isFinite(dayNtlVlm) ? dayNtlVlm : null,
+        sourceUpdatedAt
+      });
+    })
+    .filter((market): market is FundingMarket => Boolean(market));
 }
 
 async function fetchHyperliquidDexMarkets(dex: string, sourceUpdatedAt: number): Promise<FundingMarket[]> {
@@ -80,6 +83,9 @@ async function fetchHyperliquidDexMarkets(dex: string, sourceUpdatedAt: number):
       const fundingRate = Number(context?.funding);
       if (!Number.isFinite(fundingRate)) return null;
       const rawBase = asset.name.replace(/^[^:]+:/, '').toUpperCase();
+      const markPrice = Number(context?.markPx);
+      const openInterest = Number(context?.openInterest);
+      const dayNtlVlm = Number(context?.dayNtlVlm);
 
       return createFundingMarket({
         baseSymbol: normalizeBaseSymbol(rawBase),
@@ -88,6 +94,10 @@ async function fetchHyperliquidDexMarkets(dex: string, sourceUpdatedAt: number):
         fundingRate,
         nextFundingTime: nextHourlyFundingTime(sourceUpdatedAt),
         intervalHours: 1,
+        markPrice,
+        indexPrice: Number(context?.oraclePx),
+        openInterestUsd: Number.isFinite(openInterest * markPrice) ? openInterest * markPrice : null,
+        volume24hUsd: Number.isFinite(dayNtlVlm) ? dayNtlVlm : null,
         sourceUpdatedAt
       });
     })
@@ -99,10 +109,11 @@ export async function fetchBinanceMarkets(): Promise<ExchangeFetchResult> {
   const startedAt = Date.now();
 
   try {
-    const [premiumIndex, exchangeInfo, fundingInfo] = await Promise.all([
+    const [premiumIndex, exchangeInfo, fundingInfo, tickers] = await Promise.all([
       fetchJson<BinancePremiumIndex[] | BinancePremiumIndex>('https://fapi.binance.com/fapi/v1/premiumIndex'),
       fetchJson<BinanceExchangeInfo>('https://fapi.binance.com/fapi/v1/exchangeInfo'),
-      fetchJson<BinanceFundingInfo[]>('https://fapi.binance.com/fapi/v1/fundingInfo').catch(() => [])
+      fetchJson<BinanceFundingInfo[]>('https://fapi.binance.com/fapi/v1/fundingInfo').catch(() => []),
+      fetchJson<BinanceTicker24h[]>('https://fapi.binance.com/fapi/v1/ticker/24hr').catch(() => [])
     ]);
 
     const validSymbols = new Set(
@@ -118,19 +129,26 @@ export async function fetchBinanceMarkets(): Promise<ExchangeFetchResult> {
     const intervalBySymbol = new Map(
       fundingInfo.map((item) => [item.symbol, Number(item.fundingIntervalHours) || 8])
     );
+    const tickerBySymbol = new Map(tickers.map((ticker) => [ticker.symbol, ticker]));
 
     const rows = Array.isArray(premiumIndex) ? premiumIndex : [premiumIndex];
     const markets = rows
       .filter((row) => validSymbols.has(row.symbol))
       .map((row) =>
-        createFundingMarket({
-          marketSymbol: row.symbol,
-          exchange,
-          fundingRate: Number(row.lastFundingRate),
-          nextFundingTime: Number(row.nextFundingTime) || null,
-          intervalHours: intervalBySymbol.get(row.symbol) ?? 8,
-          sourceUpdatedAt: startedAt
-        })
+        {
+          const ticker = tickerBySymbol.get(row.symbol);
+          return createFundingMarket({
+            marketSymbol: row.symbol,
+            exchange,
+            fundingRate: Number(row.lastFundingRate),
+            nextFundingTime: Number(row.nextFundingTime) || null,
+            intervalHours: intervalBySymbol.get(row.symbol) ?? 8,
+            markPrice: Number(row.markPrice),
+            indexPrice: Number(row.indexPrice),
+            volume24hUsd: Number(ticker?.quoteVolume),
+            sourceUpdatedAt: startedAt
+          });
+        }
       )
       .filter((market) => Number.isFinite(market.fundingRate));
 
@@ -148,9 +166,15 @@ export async function fetchOkxMarkets(): Promise<ExchangeFetchResult> {
   const startedAt = Date.now();
 
   try {
-    const instruments = await fetchJson<OkxResponse<OkxInstrument>>(
-      'https://www.okx.com/api/v5/public/instruments?instType=SWAP'
-    );
+    const [instruments, tickers] = await Promise.all([
+      fetchJson<OkxResponse<OkxInstrument>>('https://www.okx.com/api/v5/public/instruments?instType=SWAP'),
+      fetchJson<OkxResponse<OkxTicker>>('https://www.okx.com/api/v5/market/tickers?instType=SWAP').catch(() => ({
+        code: '0',
+        msg: '',
+        data: []
+      }))
+    ]);
+    const tickerByInstId = new Map(tickers.data.map((ticker) => [ticker.instId, ticker]));
 
     const stableSwapInstruments = instruments.data.filter(
       (instrument) =>
@@ -166,6 +190,8 @@ export async function fetchOkxMarkets(): Promise<ExchangeFetchResult> {
       );
       const row = funding.data[0];
       if (!row) return null;
+      const ticker = tickerByInstId.get(instrument.instId);
+      const lastPrice = Number(ticker?.last);
 
       return createFundingMarket({
         baseSymbol: normalizeBaseSymbol(instrument.instId),
@@ -174,6 +200,8 @@ export async function fetchOkxMarkets(): Promise<ExchangeFetchResult> {
         fundingRate: Number(row.fundingRate),
         nextFundingTime: Number(row.nextFundingTime) || null,
         intervalHours: inferOkxIntervalHours(row),
+        markPrice: lastPrice,
+        volume24hUsd: estimateOkxVolumeUsd(ticker),
         sourceUpdatedAt: startedAt
       });
     });
@@ -203,6 +231,16 @@ function nextHourlyFundingTime(now: number) {
 function formatHyperliquidDexMarketSymbol(rawBase: string) {
   if (rawBase === 'CL') return 'WTIOIL-USDC';
   return `${rawBase}-USDC`;
+}
+
+function estimateOkxVolumeUsd(ticker: OkxTicker | undefined) {
+  if (!ticker) return null;
+  const last = Number(ticker.last);
+  const quoteVolume = Number(ticker.volCcy24h);
+  if (Number.isFinite(quoteVolume) && quoteVolume > 0) return quoteVolume;
+  const baseVolume = Number(ticker.vol24h);
+  if (Number.isFinite(baseVolume * last)) return baseVolume * last;
+  return null;
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -256,17 +294,6 @@ function failure(exchange: ExchangeId, error: unknown): ExchangeFetchResult {
   };
 }
 
-type HyperliquidPredictedFunding = [
-  string,
-  Array<[
-    string,
-    {
-      fundingRate: string;
-      nextFundingTime: number;
-    }
-  ]>
-];
-
 type HyperliquidMetaAndAssetCtxs = [
   {
     universe: Array<{
@@ -275,6 +302,11 @@ type HyperliquidMetaAndAssetCtxs = [
   },
   Array<{
     funding?: string;
+    markPx?: string;
+    midPx?: string;
+    oraclePx?: string;
+    openInterest?: string;
+    dayNtlVlm?: string;
   }>
 ];
 
@@ -282,6 +314,8 @@ type BinancePremiumIndex = {
   symbol: string;
   lastFundingRate: string;
   nextFundingTime: number;
+  markPrice: string;
+  indexPrice: string;
 };
 
 type BinanceExchangeInfo = {
@@ -296,6 +330,11 @@ type BinanceExchangeInfo = {
 type BinanceFundingInfo = {
   symbol: string;
   fundingIntervalHours: number;
+};
+
+type BinanceTicker24h = {
+  symbol: string;
+  quoteVolume: string;
 };
 
 type OkxResponse<T> = {
@@ -314,4 +353,11 @@ type OkxFundingRate = {
   fundingRate: string;
   fundingTime: string;
   nextFundingTime: string;
+};
+
+type OkxTicker = {
+  instId: string;
+  last: string;
+  vol24h: string;
+  volCcy24h: string;
 };

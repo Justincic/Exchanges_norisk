@@ -47,14 +47,18 @@ describe('opportunity ranking', () => {
         exchange: 'BN',
         fundingRate: 0.0002,
         nextFundingTime: 1_800_000_000_000,
-        intervalHours: 8
+        intervalHours: 8,
+        markPrice: 101,
+        volume24hUsd: 1_000_000
       }),
       createFundingMarket({
         marketSymbol: 'BTC-USDC-SWAP',
         exchange: 'OKX',
         fundingRate: -0.0001,
         nextFundingTime: 1_800_000_000_000,
-        intervalHours: 8
+        intervalHours: 8,
+        markPrice: 100,
+        volume24hUsd: 10_000_000
       })
     ]);
 
@@ -62,6 +66,10 @@ describe('opportunity ranking', () => {
     expect(opportunities[0].shortMarket?.exchange).toBe('BN');
     expect(opportunities[0].spreadAnnualized).toBeCloseTo(0.3285);
     expect(opportunities[0].hasMixedQuotes).toBe(true);
+    expect(opportunities[0].isSettlementAligned).toBe(true);
+    expect(opportunities[0].priceSpreadPct).toBeCloseTo(0.01);
+    expect(opportunities[0].minLiquidityUsd).toBe(1_000_000);
+    expect(opportunities[0].hasLiquidityWarning).toBe(true);
   });
 
   it('allows same-exchange opportunities when they have the best spread', () => {
@@ -95,6 +103,28 @@ describe('opportunity ranking', () => {
     expect(opportunities[0].longMarket?.marketSymbol).toBe('SP500-USDC');
     expect(opportunities[0].shortMarket?.marketSymbol).toBe('SPX-USD');
     expect(opportunities[0].isCrossExchange).toBe(false);
+  });
+
+  it('flags opportunities with mismatched settlement times', () => {
+    const opportunities = buildOpportunities([
+      createFundingMarket({
+        marketSymbol: 'WTIOIL-USDC',
+        exchange: 'HL',
+        fundingRate: -0.0002,
+        nextFundingTime: 1_800_000_000_000,
+        intervalHours: 1
+      }),
+      createFundingMarket({
+        marketSymbol: 'CLUSDT',
+        exchange: 'BN',
+        fundingRate: -0.0001,
+        nextFundingTime: 1_800_007_200_000,
+        intervalHours: 8
+      })
+    ]);
+
+    expect(opportunities[0].settlementTimeDiffMs).toBe(7_200_000);
+    expect(opportunities[0].isSettlementAligned).toBe(false);
   });
 
   it('keeps mixed USDT/USDC opportunities by default and can filter them out', () => {

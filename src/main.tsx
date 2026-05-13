@@ -1,12 +1,188 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ArrowDownUp, Clock3, RefreshCw, Search, TrendingUp } from 'lucide-react';
+import { Clock3, Languages, Moon, RefreshCw, Search, Sun, TrendingUp } from 'lucide-react';
 import { filterMixedQuotes } from './shared/funding';
 import type { ExchangeId, FundingMarket, FundingOpportunity, FundingSnapshot } from './shared/types';
 import './styles.css';
 
 const REFRESH_MS = 60_000;
 type SortKey = 'spread' | 'symbol' | 'fundingTime' | 'freshness';
+type Language = 'en' | 'zh-TW' | 'zh-CN';
+type Theme = 'light' | 'dark';
+
+const COPY = {
+  en: {
+    eyebrow: 'HL / OKX / BN perpetual funding monitor',
+    title: 'Funding Arbitrage',
+    refreshData: 'Refresh funding data',
+    bestSpread: 'Best spread',
+    annualized: 'annualized',
+    waiting: 'Waiting for data',
+    markets: 'Markets',
+    normalizedMarkets: 'normalized perp markets',
+    refresh: 'Refresh',
+    updated: 'updated',
+    notLoaded: 'not loaded yet',
+    search: 'Search BTC, WTI, TSLA...',
+    minApr: 'Min APR spread',
+    sort: 'Sort',
+    bestSpreadSort: 'Best spread',
+    symbol: 'Symbol',
+    nextFundingSort: 'Next funding',
+    freshness: 'Freshness',
+    mixQuotes: 'Mix USDT/USDC',
+    language: 'Language',
+    theme: 'Theme',
+    light: 'Light',
+    dark: 'Dark',
+    snapshotError: 'Snapshot error',
+    loading: 'Loading live funding data...',
+    asset: 'Asset',
+    opportunity: 'Opportunity',
+    mixedQuotes: 'mixed quotes',
+    singleQuote: 'single quote',
+    crossVenue: 'cross venue',
+    sameVenue: 'same venue',
+    aligned: 'aligned',
+    timingRisk: 'timing risk',
+    settlementGap: 'settlement gap',
+    long: 'Long',
+    short: 'Short',
+    aprSpread: 'APR spread',
+    eightHourEquiv: '8h equiv',
+    nextFunding: 'Next funding',
+    longFunding: 'Long funding',
+    shortFunding: 'Short funding',
+    noMarket: 'No market',
+    current: 'Current',
+    apr: 'APR',
+    price: 'Price',
+    priceSpread: 'Price spread',
+    minLiquidity: 'Min liquidity',
+    liquidityRisk: 'thin liquidity',
+    liquidityOk: 'liquidity ok',
+    openInterest: 'OI',
+    volume24h: '24h vol',
+    empty: 'No opportunities match the current filters.',
+    now: 'just now',
+    secondsAgo: 's ago',
+    minutesAgo: 'm ago'
+  },
+  'zh-TW': {
+    eyebrow: 'HL / OKX / BN 永續資金費率監控',
+    title: '資金費率套利',
+    refreshData: '刷新資金費率資料',
+    bestSpread: '最佳價差',
+    annualized: '年化',
+    waiting: '等待資料',
+    markets: '市場數',
+    normalizedMarkets: '已正規化永續市場',
+    refresh: '刷新',
+    updated: '更新於',
+    notLoaded: '尚未載入',
+    search: '搜尋 BTC, WTI, TSLA...',
+    minApr: '最低年化價差',
+    sort: '排序',
+    bestSpreadSort: '最佳價差',
+    symbol: '標的',
+    nextFundingSort: '下次收費',
+    freshness: '資料新鮮度',
+    mixQuotes: '混合 USDT/USDC',
+    language: '語言',
+    theme: '主題',
+    light: '亮色',
+    dark: '暗色',
+    snapshotError: '快照錯誤',
+    loading: '正在載入即時資金費率...',
+    asset: '標的',
+    opportunity: '機會',
+    mixedQuotes: '混合報價',
+    singleQuote: '單一報價',
+    crossVenue: '跨平台',
+    sameVenue: '同平台',
+    aligned: '時間一致',
+    timingRisk: '時間風險',
+    settlementGap: '結算差',
+    long: '做多',
+    short: '做空',
+    aprSpread: '年化價差',
+    eightHourEquiv: '8h 等效',
+    nextFunding: '下次收費',
+    longFunding: '多單收費',
+    shortFunding: '空單收費',
+    noMarket: '無市場',
+    current: '當期',
+    apr: '年化',
+    price: '價格',
+    priceSpread: '價格差',
+    minLiquidity: '最低流動性',
+    liquidityRisk: '深度偏薄',
+    liquidityOk: '深度可用',
+    openInterest: 'OI',
+    volume24h: '24h 量',
+    empty: '目前篩選條件下沒有符合的機會。',
+    now: '剛剛',
+    secondsAgo: '秒前',
+    minutesAgo: '分鐘前'
+  },
+  'zh-CN': {
+    eyebrow: 'HL / OKX / BN 永续资金费率监控',
+    title: '资金费率套利',
+    refreshData: '刷新资金费率数据',
+    bestSpread: '最佳价差',
+    annualized: '年化',
+    waiting: '等待数据',
+    markets: '市场数',
+    normalizedMarkets: '已标准化永续市场',
+    refresh: '刷新',
+    updated: '更新于',
+    notLoaded: '尚未加载',
+    search: '搜索 BTC, WTI, TSLA...',
+    minApr: '最低年化价差',
+    sort: '排序',
+    bestSpreadSort: '最佳价差',
+    symbol: '标的',
+    nextFundingSort: '下次收费',
+    freshness: '数据新鲜度',
+    mixQuotes: '混合 USDT/USDC',
+    language: '语言',
+    theme: '主题',
+    light: '亮色',
+    dark: '暗色',
+    snapshotError: '快照错误',
+    loading: '正在加载实时资金费率...',
+    asset: '标的',
+    opportunity: '机会',
+    mixedQuotes: '混合报价',
+    singleQuote: '单一报价',
+    crossVenue: '跨平台',
+    sameVenue: '同平台',
+    aligned: '时间一致',
+    timingRisk: '时间风险',
+    settlementGap: '结算差',
+    long: '做多',
+    short: '做空',
+    aprSpread: '年化价差',
+    eightHourEquiv: '8h 等效',
+    nextFunding: '下次收费',
+    longFunding: '多单收费',
+    shortFunding: '空单收费',
+    noMarket: '无市场',
+    current: '当期',
+    apr: '年化',
+    price: '价格',
+    priceSpread: '价格差',
+    minLiquidity: '最低流动性',
+    liquidityRisk: '深度偏薄',
+    liquidityOk: '深度可用',
+    openInterest: 'OI',
+    volume24h: '24h 量',
+    empty: '当前筛选条件下没有符合的机会。',
+    now: '刚刚',
+    secondsAgo: '秒前',
+    minutesAgo: '分钟前'
+  }
+} satisfies Record<Language, Record<string, string>>;
 
 function App() {
   const [snapshot, setSnapshot] = React.useState<FundingSnapshot | null>(null);
@@ -15,19 +191,25 @@ function App() {
   const [query, setQuery] = React.useState('');
   const [minApr, setMinApr] = React.useState(0);
   const [sortKey, setSortKey] = React.useState<SortKey>('spread');
-  const [showAnnualized, setShowAnnualized] = React.useState(true);
   const [includeMixedQuotes, setIncludeMixedQuotes] = React.useState(true);
+  const [language, setLanguage] = React.useState<Language>('zh-TW');
+  const [theme, setTheme] = React.useState<Theme>('dark');
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = React.useState(false);
+  const t = COPY[language];
 
-  const loadSnapshot = React.useCallback(async () => {
+  const loadSnapshot = React.useCallback(async (forceRefresh = false) => {
+    setIsRefreshing(true);
     setError(null);
     try {
-      const response = await fetch('/api/funding/snapshot');
+      const response = await fetch(`/api/funding/snapshot${forceRefresh ? '?refresh=1' : ''}`);
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
       setSnapshot((await response.json()) as FundingSnapshot);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load funding snapshot');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -36,6 +218,11 @@ function App() {
     const timer = window.setInterval(loadSnapshot, REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [loadSnapshot]);
+
+  React.useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.lang = language;
+  }, [language, theme]);
 
   const opportunities = React.useMemo(() => {
     const rows = filterMixedQuotes(snapshot?.opportunities ?? [], includeMixedQuotes)
@@ -51,29 +238,67 @@ function App() {
     <main className="shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">HL / OKX / BN perpetual funding monitor</p>
-          <h1>Funding Arbitrage</h1>
+          <p className="eyebrow">{t.eyebrow}</p>
+          <h1>{t.title}</h1>
         </div>
-        <button className="iconButton" onClick={loadSnapshot} aria-label="Refresh funding data">
-          <RefreshCw size={18} />
-        </button>
+        <div className="topActions">
+          <button className="iconButton" onClick={() => void loadSnapshot(true)} aria-label={t.refreshData}>
+            <RefreshCw className={isRefreshing ? 'spinIcon' : ''} size={18} />
+          </button>
+          <div className="menuWrap">
+            <button
+              className="iconButton"
+              onClick={() => setIsLanguageMenuOpen((open) => !open)}
+              aria-label={t.language}
+            >
+              <Languages size={18} />
+            </button>
+            {isLanguageMenuOpen ? (
+              <div className="langMenu">
+                {[
+                  ['zh-TW', '繁中'],
+                  ['zh-CN', '简中'],
+                  ['en', 'English']
+                ].map(([value, label]) => (
+                  <button
+                    className={language === value ? 'langOption active' : 'langOption'}
+                    key={value}
+                    onClick={() => {
+                      setLanguage(value as Language);
+                      setIsLanguageMenuOpen(false);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <button
+            className="iconButton"
+            onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+            aria-label={t.theme}
+          >
+            {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
+        </div>
       </header>
 
       <section className="summaryBand">
         <Metric
-          label="Best spread"
+          label={t.bestSpread}
           value={topOpportunity ? formatPercent(topOpportunity.spreadAnnualized) : '--'}
-          helper={topOpportunity ? `${topOpportunity.baseSymbol} annualized` : 'Waiting for data'}
+          helper={topOpportunity ? `${topOpportunity.baseSymbol} ${t.annualized}` : t.waiting}
         />
         <Metric
-          label="Markets"
+          label={t.markets}
           value={String(snapshot?.opportunities.reduce((sum, item) => sum + item.markets.length, 0) ?? 0)}
-          helper="normalized perp markets"
+          helper={t.normalizedMarkets}
         />
         <Metric
-          label="Refresh"
+          label={t.refresh}
           value="60s"
-          helper={snapshot ? `updated ${formatRelativeTime(snapshot.generatedAt)}` : 'not loaded yet'}
+          helper={snapshot ? `${t.updated} ${formatRelativeTime(snapshot.generatedAt, t)}` : t.notLoaded}
         />
         <div className="healthStrip">
           {(snapshot?.health ?? ['HL', 'OKX', 'BN'].map((exchange) => ({ exchange, ok: false, lastUpdatedAt: null }))).map(
@@ -92,11 +317,11 @@ function App() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search BTC, ETH, SOL..."
+            placeholder={t.search}
           />
         </label>
         <label className="field">
-          <span>Min APR spread</span>
+          <span>{t.minApr}</span>
           <input
             type="number"
             min="0"
@@ -106,21 +331,13 @@ function App() {
           />
         </label>
         <label className="field">
-          <span>Sort</span>
+          <span>{t.sort}</span>
           <select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)}>
-            <option value="spread">Best spread</option>
-            <option value="symbol">Symbol</option>
-            <option value="fundingTime">Next funding</option>
-            <option value="freshness">Freshness</option>
+            <option value="spread">{t.bestSpreadSort}</option>
+            <option value="symbol">{t.symbol}</option>
+            <option value="fundingTime">{t.nextFundingSort}</option>
+            <option value="freshness">{t.freshness}</option>
           </select>
-        </label>
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={showAnnualized}
-            onChange={(event) => setShowAnnualized(event.target.checked)}
-          />
-          <span>Annualized</span>
         </label>
         <label className="toggle">
           <input
@@ -128,29 +345,29 @@ function App() {
             checked={includeMixedQuotes}
             onChange={(event) => setIncludeMixedQuotes(event.target.checked)}
           />
-          <span>Mix USDT/USDC</span>
+          <span>{t.mixQuotes}</span>
         </label>
       </section>
 
-      {error ? <div className="notice error">Snapshot error: {error}</div> : null}
-      {loading ? <div className="notice">Loading live funding data...</div> : null}
+      {error ? <div className="notice error">{t.snapshotError}: {error}</div> : null}
+      {loading ? <div className="notice">{t.loading}</div> : null}
 
       <section className="tableWrap" aria-label="Funding opportunities">
         <div className="tableHeader">
-          <span>Asset</span>
-          <span>Opportunity</span>
-          <span>Markets</span>
+          <span>{t.asset}</span>
+          <span>{t.opportunity}</span>
+          <span>{t.markets}</span>
         </div>
         <div className="rows">
           {opportunities.map((opportunity) => (
             <OpportunityRow
               key={opportunity.baseSymbol}
               opportunity={opportunity}
-              showAnnualized={showAnnualized}
+              t={t}
             />
           ))}
           {!loading && opportunities.length === 0 ? (
-            <div className="empty">No opportunities match the current filters.</div>
+            <div className="empty">{t.empty}</div>
           ) : null}
         </div>
       </section>
@@ -170,20 +387,26 @@ function Metric({ label, value, helper }: { label: string; value: string; helper
 
 function OpportunityRow({
   opportunity,
-  showAnnualized
+  t
 }: {
   opportunity: FundingOpportunity;
-  showAnnualized: boolean;
+  t: (typeof COPY)[Language];
 }) {
   return (
     <article className="opportunityRow">
       <div className="assetCell">
         <strong>{opportunity.baseSymbol}</strong>
         <span className={opportunity.hasMixedQuotes ? 'quoteNote active' : 'quoteNote'}>
-          {opportunity.hasMixedQuotes ? 'mixed quotes' : 'single quote'}
+          {opportunity.hasMixedQuotes ? t.mixedQuotes : t.singleQuote}
         </span>
         <span className={opportunity.isCrossExchange ? 'quoteNote active' : 'quoteNote'}>
-          {opportunity.isCrossExchange ? 'cross venue' : 'same venue'}
+          {opportunity.isCrossExchange ? t.crossVenue : t.sameVenue}
+        </span>
+        <span className={opportunity.isSettlementAligned ? 'quoteNote good' : 'quoteNote risk'}>
+          {opportunity.isSettlementAligned ? t.aligned : t.timingRisk}
+        </span>
+        <span className={opportunity.hasLiquidityWarning ? 'quoteNote risk' : 'quoteNote good'}>
+          {opportunity.hasLiquidityWarning ? t.liquidityRisk : t.liquidityOk}
         </span>
       </div>
 
@@ -191,17 +414,29 @@ function OpportunityRow({
         <div className="directionLine">
           <TrendingUp size={16} />
           <span>
-            Long {formatMarketName(opportunity.longMarket)} / Short {formatMarketName(opportunity.shortMarket)}
+            {t.long} {formatMarketName(opportunity.longMarket)} / {t.short} {formatMarketName(opportunity.shortMarket)}
           </span>
         </div>
         <div className="spreadLine">
           <strong>{formatPercent(opportunity.spreadAnnualized)}</strong>
-          <span>APR spread</span>
-          <span>{formatPercent(opportunity.spreadPerPeriod)} 8h equiv</span>
+          <span>{t.aprSpread}</span>
+          <span>{formatPercent(opportunity.spreadPerPeriod)} {t.eightHourEquiv}</span>
         </div>
         <div className="timeLine">
           <Clock3 size={14} />
-          <span>Next funding {formatDateTime(opportunity.nextFundingTime)}</span>
+          <span>{t.longFunding} {formatDateTime(opportunity.longMarket?.nextFundingTime ?? null)}</span>
+        </div>
+        <div className="timeLine">
+          <Clock3 size={14} />
+          <span>{t.shortFunding} {formatDateTime(opportunity.shortMarket?.nextFundingTime ?? null)}</span>
+        </div>
+        <div className={opportunity.isSettlementAligned ? 'timeLine aligned' : 'timeLine risk'}>
+          <Clock3 size={14} />
+          <span>{t.settlementGap} {formatDuration(opportunity.settlementTimeDiffMs)}</span>
+        </div>
+        <div className="riskLine">
+          <span>{t.priceSpread} {formatNullablePercent(opportunity.priceSpreadPct)}</span>
+          <span>{t.minLiquidity} {formatUsdCompact(opportunity.minLiquidityUsd)}</span>
         </div>
       </div>
 
@@ -211,7 +446,7 @@ function OpportunityRow({
             key={exchange}
             exchange={exchange}
             markets={opportunity.markets.filter((market) => market.exchange === exchange)}
-            showAnnualized={showAnnualized}
+            t={t}
           />
         ))}
       </div>
@@ -222,11 +457,11 @@ function OpportunityRow({
 function ExchangeColumn({
   exchange,
   markets,
-  showAnnualized
+  t
 }: {
   exchange: ExchangeId;
   markets: FundingMarket[];
-  showAnnualized: boolean;
+  t: (typeof COPY)[Language];
 }) {
   return (
     <div className="exchangeColumn">
@@ -239,17 +474,21 @@ function ExchangeColumn({
               <span>{market.marketSymbol}</span>
             </div>
             <div className="rateBar" style={{ '--rate': clampRate(market.annualizedRate) } as React.CSSProperties}>
-              <span className={market.annualizedRate >= 0 ? 'positive rateValue' : 'negative rateValue'}>
-                {showAnnualized
-                  ? formatPercent(market.annualizedRate)
-                  : `${formatPercent(market.fundingRate)} / ${market.intervalHours}h`}
-              </span>
+              <div className={market.fundingRate >= 0 ? 'positive rateValue rateStack' : 'negative rateValue rateStack'}>
+                <span>{t.current} {formatPercent(market.fundingRate)} / {market.intervalHours}h</span>
+                <small>{t.apr} {formatPercent(market.annualizedRate)}</small>
+              </div>
+            </div>
+            <div className="marketStats">
+              <span>{t.price} {formatPrice(market.markPrice)}</span>
+              <span>{t.openInterest} {formatUsdCompact(market.openInterestUsd)}</span>
+              <span>{t.volume24h} {formatUsdCompact(market.volume24hUsd)}</span>
             </div>
             <small>{formatDateTime(market.nextFundingTime)}</small>
           </div>
         ))
       ) : (
-        <div className="missing">No market</div>
+        <div className="missing">{t.noMarket}</div>
       )}
     </div>
   );
@@ -277,6 +516,28 @@ function formatPercent(value: number) {
   return `${(value * 100).toFixed(Math.abs(value) < 0.001 ? 4 : 2)}%`;
 }
 
+function formatNullablePercent(value: number | null) {
+  if (value === null) return '--';
+  return formatPercent(value);
+}
+
+function formatPrice(value: number | null) {
+  if (value === null) return '--';
+  if (Math.abs(value) >= 1000) return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (Math.abs(value) >= 1) return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  return value.toLocaleString(undefined, { maximumFractionDigits: 8 });
+}
+
+function formatUsdCompact(value: number | null) {
+  if (value === null) return '--';
+  return new Intl.NumberFormat(undefined, {
+    notation: 'compact',
+    maximumFractionDigits: 2,
+    style: 'currency',
+    currency: 'USD'
+  }).format(value);
+}
+
 function formatDateTime(time: number | null) {
   if (!time) return '--';
   return new Intl.DateTimeFormat(undefined, {
@@ -287,10 +548,20 @@ function formatDateTime(time: number | null) {
   }).format(new Date(time));
 }
 
-function formatRelativeTime(time: number) {
+function formatRelativeTime(time: number, t: (typeof COPY)[Language]) {
   const seconds = Math.max(0, Math.round((Date.now() - time) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
-  return `${Math.round(seconds / 60)}m ago`;
+  if (seconds < 3) return t.now;
+  if (seconds < 60) return `${seconds}${t.secondsAgo}`;
+  return `${Math.round(seconds / 60)}${t.minutesAgo}`;
+}
+
+function formatDuration(durationMs: number | null) {
+  if (durationMs === null) return '--';
+  const minutes = Math.round(durationMs / 60_000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
 function clampRate(value: number) {
