@@ -17,6 +17,14 @@ describe('funding normalization', () => {
     expect(normalizeBaseSymbol('BTC')).toBe('BTC');
   });
 
+  it('maps TradFi aliases to the same canonical base symbol', () => {
+    expect(normalizeBaseSymbol('CLUSDT')).toBe('WTI');
+    expect(normalizeBaseSymbol('CL-USDT-SWAP')).toBe('WTI');
+    expect(normalizeBaseSymbol('WTIOIL')).toBe('WTI');
+    expect(normalizeBaseSymbol('BZUSDT')).toBe('BRENT');
+    expect(normalizeBaseSymbol('GOLD-USDT-SWAP')).toBe('XAU');
+  });
+
   it('preserves quote asset for display', () => {
     expect(detectQuoteAsset('BTCUSDT')).toBe('USDT');
     expect(detectQuoteAsset('BTC-USDC-SWAP')).toBe('USDC');

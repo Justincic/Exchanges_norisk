@@ -1,6 +1,26 @@
 import type { ExchangeId, FundingMarket, FundingOpportunity, QuoteAsset } from './types';
 
 const STABLE_QUOTES = ['USDT', 'USDC', 'USD'] as const;
+const BASE_ALIASES: Record<string, string> = {
+  CL: 'WTI',
+  WTIOIL: 'WTI',
+  WTI: 'WTI',
+  BZ: 'BRENT',
+  BRENT: 'BRENT',
+  BRENTCRUDE: 'BRENT',
+  NATGAS: 'NATGAS',
+  NG: 'NATGAS',
+  COPPER: 'COPPER',
+  HG: 'COPPER',
+  GOLD: 'XAU',
+  XAU: 'XAU',
+  SILVER: 'XAG',
+  XAG: 'XAG',
+  PLATINUM: 'XPT',
+  XPT: 'XPT',
+  PALLADIUM: 'XPD',
+  XPD: 'XPD'
+};
 
 export function detectQuoteAsset(symbol: string): QuoteAsset {
   const segments = symbol.toUpperCase().split(/[-_/]/);
@@ -20,16 +40,16 @@ export function normalizeBaseSymbol(symbol: string): string {
   const firstSegment = upper.split(/[-_/]/)[0];
 
   if (upper.includes('-')) {
-    return firstSegment;
+    return canonicalizeBaseSymbol(firstSegment);
   }
 
   for (const quote of STABLE_QUOTES) {
     if (upper.endsWith(quote) && upper.length > quote.length) {
-      return upper.slice(0, -quote.length);
+      return canonicalizeBaseSymbol(upper.slice(0, -quote.length));
     }
   }
 
-  return upper;
+  return canonicalizeBaseSymbol(upper);
 }
 
 export function annualizeFundingRate(fundingRate: number, intervalHours: number): number {
@@ -144,4 +164,8 @@ function sortMarketsForDisplay(markets: FundingMarket[]) {
     if (exchangeDiff !== 0) return exchangeDiff;
     return a.marketSymbol.localeCompare(b.marketSymbol);
   });
+}
+
+function canonicalizeBaseSymbol(baseSymbol: string): string {
+  return BASE_ALIASES[baseSymbol] ?? baseSymbol;
 }
