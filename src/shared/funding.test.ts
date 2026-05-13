@@ -22,7 +22,9 @@ describe('funding normalization', () => {
     expect(normalizeBaseSymbol('CL-USDT-SWAP')).toBe('WTI');
     expect(normalizeBaseSymbol('WTIOIL')).toBe('WTI');
     expect(normalizeBaseSymbol('BZUSDT')).toBe('BRENT');
+    expect(normalizeBaseSymbol('xyz:BRENTOIL')).toBe('BRENT');
     expect(normalizeBaseSymbol('GOLD-USDT-SWAP')).toBe('XAU');
+    expect(normalizeBaseSymbol('xyz:SP500')).toBe('SPX');
   });
 
   it('preserves quote asset for display', () => {
@@ -60,6 +62,39 @@ describe('opportunity ranking', () => {
     expect(opportunities[0].shortMarket?.exchange).toBe('BN');
     expect(opportunities[0].spreadAnnualized).toBeCloseTo(0.3285);
     expect(opportunities[0].hasMixedQuotes).toBe(true);
+  });
+
+  it('allows same-exchange opportunities when they have the best spread', () => {
+    const opportunities = buildOpportunities([
+      createFundingMarket({
+        baseSymbol: 'SPX',
+        marketSymbol: 'SP500-USDC',
+        exchange: 'HL',
+        fundingRate: -0.0001,
+        nextFundingTime: null,
+        intervalHours: 1
+      }),
+      createFundingMarket({
+        baseSymbol: 'SPX',
+        marketSymbol: 'SPX-USD',
+        exchange: 'HL',
+        fundingRate: 0.0002,
+        nextFundingTime: null,
+        intervalHours: 1
+      }),
+      createFundingMarket({
+        baseSymbol: 'SPX',
+        marketSymbol: 'SPXUSDT',
+        exchange: 'BN',
+        fundingRate: 0.00005,
+        nextFundingTime: null,
+        intervalHours: 1
+      })
+    ]);
+
+    expect(opportunities[0].longMarket?.marketSymbol).toBe('SP500-USDC');
+    expect(opportunities[0].shortMarket?.marketSymbol).toBe('SPX-USD');
+    expect(opportunities[0].isCrossExchange).toBe(false);
   });
 
   it('keeps mixed USDT/USDC opportunities by default and can filter them out', () => {

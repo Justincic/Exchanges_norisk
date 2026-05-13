@@ -22,6 +22,7 @@ export type FundingOpportunity = {
   spreadPerPeriod: number;
   nextFundingTime: number | null;
   hasMixedQuotes: boolean;
+  isCrossExchange: boolean;
 };
 
 export type ExchangeHealth = {

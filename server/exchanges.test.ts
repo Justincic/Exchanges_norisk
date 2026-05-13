@@ -5,18 +5,27 @@ describe('exchange adapters', () => {
   it('normalizes Hyperliquid predicted funding rows', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => [
-          [
-            'BTC',
-            [
-              ['HlPerp', { fundingRate: '0.0000125', nextFundingTime: 1_800_000_000_000 }],
-              ['BinPerp', { fundingRate: '0.0001', nextFundingTime: 1_800_000_000_000 }]
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body));
+        if (body.type === 'predictedFundings') {
+          return {
+            ok: true,
+            json: async () => [
+              [
+                'BTC',
+                [
+                  ['HlPerp', { fundingRate: '0.0000125', nextFundingTime: 1_800_000_000_000 }],
+                  ['BinPerp', { fundingRate: '0.0001', nextFundingTime: 1_800_000_000_000 }]
+                ]
+              ]
             ]
-          ]
-        ]
-      }))
+          };
+        }
+        return {
+          ok: true,
+          json: async () => [{ universe: [] }, []]
+        };
+      })
     );
 
     const result = await fetchHyperliquidMarkets();
@@ -29,6 +38,35 @@ describe('exchange adapters', () => {
       fundingRate: 0.0000125,
       intervalHours: 1
     });
+    vi.unstubAllGlobals();
+  });
+
+  it('normalizes Hyperliquid xyz HIP-3 markets', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body));
+        if (body.type === 'predictedFundings') {
+          return {
+            ok: true,
+            json: async () => []
+          };
+        }
+        return {
+          ok: true,
+          json: async () => [
+            { universe: [{ name: 'xyz:CL' }, { name: 'xyz:GOLD' }] },
+            [{ funding: '-0.0002' }, { funding: '0.00001' }]
+          ]
+        };
+      })
+    );
+
+    const result = await fetchHyperliquidMarkets();
+
+    expect(result.health.ok).toBe(true);
+    expect(result.markets.map((market) => market.marketSymbol)).toEqual(['WTIOIL-USDC', 'GOLD-USDC']);
+    expect(result.markets.map((market) => market.baseSymbol)).toEqual(['WTI', 'XAU']);
     vi.unstubAllGlobals();
   });
 

@@ -182,6 +182,9 @@ function OpportunityRow({
         <span className={opportunity.hasMixedQuotes ? 'quoteNote active' : 'quoteNote'}>
           {opportunity.hasMixedQuotes ? 'mixed quotes' : 'single quote'}
         </span>
+        <span className={opportunity.isCrossExchange ? 'quoteNote active' : 'quoteNote'}>
+          {opportunity.isCrossExchange ? 'cross venue' : 'same venue'}
+        </span>
       </div>
 
       <div className="directionCell">

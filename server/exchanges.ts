@@ -4,6 +4,7 @@ import type { ExchangeHealth, ExchangeId, FundingMarket, QuoteAsset } from '../s
 const JSON_HEADERS = { 'content-type': 'application/json' };
 const REQUEST_TIMEOUT_MS = 12_000;
 const OKX_CONCURRENCY = 6;
+const HYPERLIQUID_HIP3_DEXS = ['xyz'];
 
 export type ExchangeFetchResult = {
   markets: FundingMarket[];
@@ -19,35 +20,11 @@ export async function fetchHyperliquidMarkets(): Promise<ExchangeFetchResult> {
   const startedAt = Date.now();
 
   try {
-    const data = await fetchJson<HyperliquidPredictedFunding[]>(
-      'https://api.hyperliquid.xyz/info',
-      {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ type: 'predictedFundings' })
-      }
-    );
-
-    const markets: FundingMarket[] = [];
-    for (const [coin, venues] of data) {
-      for (const [venue, venueFunding] of venues) {
-        if (venue !== 'HlPerp') continue;
-        const fundingRate = Number(venueFunding.fundingRate);
-        if (!Number.isFinite(fundingRate)) continue;
-
-        markets.push(
-          createFundingMarket({
-            baseSymbol: coin.toUpperCase(),
-            marketSymbol: `${coin.toUpperCase()}-USD`,
-            exchange,
-            fundingRate,
-            nextFundingTime: Number(venueFunding.nextFundingTime) || null,
-            intervalHours: 1,
-            sourceUpdatedAt: startedAt
-          })
-        );
-      }
-    }
+    const [coreMarkets, hip3Markets] = await Promise.all([
+      fetchHyperliquidCoreMarkets(startedAt),
+      Promise.all(HYPERLIQUID_HIP3_DEXS.map((dex) => fetchHyperliquidDexMarkets(dex, startedAt)))
+    ]);
+    const markets = [...coreMarkets, ...hip3Markets.flat()];
 
     return {
       markets,
@@ -56,6 +33,65 @@ export async function fetchHyperliquidMarkets(): Promise<ExchangeFetchResult> {
   } catch (error) {
     return failure(exchange, error);
   }
+}
+
+async function fetchHyperliquidCoreMarkets(sourceUpdatedAt: number): Promise<FundingMarket[]> {
+  const exchange: ExchangeId = 'HL';
+  const data = await fetchJson<HyperliquidPredictedFunding[]>('https://api.hyperliquid.xyz/info', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ type: 'predictedFundings' })
+  });
+
+  const markets: FundingMarket[] = [];
+  for (const [coin, venues] of data) {
+    for (const [venue, venueFunding] of venues) {
+      if (venue !== 'HlPerp') continue;
+      const fundingRate = Number(venueFunding.fundingRate);
+      if (!Number.isFinite(fundingRate)) continue;
+
+      markets.push(
+        createFundingMarket({
+          baseSymbol: normalizeBaseSymbol(coin),
+          marketSymbol: `${coin.toUpperCase()}-USD`,
+          exchange,
+          fundingRate,
+          nextFundingTime: Number(venueFunding.nextFundingTime) || null,
+          intervalHours: 1,
+          sourceUpdatedAt
+        })
+      );
+    }
+  }
+  return markets;
+}
+
+async function fetchHyperliquidDexMarkets(dex: string, sourceUpdatedAt: number): Promise<FundingMarket[]> {
+  const exchange: ExchangeId = 'HL';
+  const [meta, contexts] = await fetchJson<HyperliquidMetaAndAssetCtxs>('https://api.hyperliquid.xyz/info', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ type: 'metaAndAssetCtxs', dex })
+  });
+
+  return meta.universe
+    .map((asset, index) => {
+      const context = contexts[index];
+      const fundingRate = Number(context?.funding);
+      if (!Number.isFinite(fundingRate)) return null;
+      const rawBase = asset.name.replace(/^[^:]+:/, '').toUpperCase();
+
+      return createFundingMarket({
+        baseSymbol: normalizeBaseSymbol(rawBase),
+        marketSymbol: formatHyperliquidDexMarketSymbol(rawBase),
+        exchange,
+        fundingRate,
+        nextFundingTime: nextHourlyFundingTime(sourceUpdatedAt),
+        intervalHours: 1,
+        sourceUpdatedAt
+      });
+    })
+    .filter((market): market is FundingMarket => Boolean(market));
 }
 
 export async function fetchBinanceMarkets(): Promise<ExchangeFetchResult> {
@@ -160,6 +196,15 @@ function inferOkxIntervalHours(row: OkxFundingRate): number {
   return 8;
 }
 
+function nextHourlyFundingTime(now: number) {
+  return Math.ceil(now / 3_600_000) * 3_600_000;
+}
+
+function formatHyperliquidDexMarketSymbol(rawBase: string) {
+  if (rawBase === 'CL') return 'WTIOIL-USDC';
+  return `${rawBase}-USDC`;
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -220,6 +265,17 @@ type HyperliquidPredictedFunding = [
       nextFundingTime: number;
     }
   ]>
+];
+
+type HyperliquidMetaAndAssetCtxs = [
+  {
+    universe: Array<{
+      name: string;
+    }>;
+  },
+  Array<{
+    funding?: string;
+  }>
 ];
 
 type BinancePremiumIndex = {

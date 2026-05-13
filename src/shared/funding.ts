@@ -8,6 +8,7 @@ const BASE_ALIASES: Record<string, string> = {
   BZ: 'BRENT',
   BRENT: 'BRENT',
   BRENTCRUDE: 'BRENT',
+  BRENTOIL: 'BRENT',
   NATGAS: 'NATGAS',
   NG: 'NATGAS',
   COPPER: 'COPPER',
@@ -19,7 +20,8 @@ const BASE_ALIASES: Record<string, string> = {
   PLATINUM: 'XPT',
   XPT: 'XPT',
   PALLADIUM: 'XPD',
-  XPD: 'XPD'
+  XPD: 'XPD',
+  SP500: 'SPX'
 };
 
 export function detectQuoteAsset(symbol: string): QuoteAsset {
@@ -36,7 +38,7 @@ export function detectQuoteAsset(symbol: string): QuoteAsset {
 }
 
 export function normalizeBaseSymbol(symbol: string): string {
-  const upper = symbol.toUpperCase().trim();
+  const upper = symbol.toUpperCase().trim().replace(/^[A-Z0-9]+:/, '');
   const firstSegment = upper.split(/[-_/]/)[0];
 
   if (upper.includes('-')) {
@@ -95,11 +97,11 @@ export function buildOpportunities(markets: FundingMarket[]): FundingOpportunity
   }
 
   return Array.from(grouped.entries())
-    .filter(([, group]) => new Set(group.map((market) => market.exchange)).size >= 2)
+    .filter(([, group]) => group.length >= 2)
     .map(([baseSymbol, group]) => {
-      const sortedByApr = [...group].sort((a, b) => a.annualizedRate - b.annualizedRate);
-      const longMarket = sortedByApr[0] ?? null;
-      const shortMarket = sortedByApr[sortedByApr.length - 1] ?? null;
+      const bestPair = findBestPair(group);
+      const longMarket = bestPair?.longMarket ?? null;
+      const shortMarket = bestPair?.shortMarket ?? null;
       const spreadAnnualized =
         longMarket && shortMarket ? shortMarket.annualizedRate - longMarket.annualizedRate : 0;
       const spreadPerPeriod =
@@ -115,7 +117,8 @@ export function buildOpportunities(markets: FundingMarket[]): FundingOpportunity
         spreadAnnualized,
         spreadPerPeriod,
         nextFundingTime,
-        hasMixedQuotes: quoteSet.size > 1
+        hasMixedQuotes: quoteSet.size > 1,
+        isCrossExchange: Boolean(longMarket && shortMarket && longMarket.exchange !== shortMarket.exchange)
       };
     })
     .sort((a, b) => b.spreadAnnualized - a.spreadAnnualized);
@@ -164,6 +167,22 @@ function sortMarketsForDisplay(markets: FundingMarket[]) {
     if (exchangeDiff !== 0) return exchangeDiff;
     return a.marketSymbol.localeCompare(b.marketSymbol);
   });
+}
+
+function findBestPair(markets: FundingMarket[]) {
+  let bestPair: { longMarket: FundingMarket; shortMarket: FundingMarket; spreadAnnualized: number } | null = null;
+
+  for (const longMarket of markets) {
+    for (const shortMarket of markets) {
+      if (longMarket.marketSymbol === shortMarket.marketSymbol && longMarket.exchange === shortMarket.exchange) continue;
+      const spreadAnnualized = shortMarket.annualizedRate - longMarket.annualizedRate;
+      if (!bestPair || spreadAnnualized > bestPair.spreadAnnualized) {
+        bestPair = { longMarket, shortMarket, spreadAnnualized };
+      }
+    }
+  }
+
+  return bestPair;
 }
 
 function canonicalizeBaseSymbol(baseSymbol: string): string {
