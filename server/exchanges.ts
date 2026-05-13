@@ -73,7 +73,7 @@ export async function fetchBinanceMarkets(): Promise<ExchangeFetchResult> {
       exchangeInfo.symbols
         .filter(
           (symbol) =>
-            symbol.contractType === 'PERPETUAL' &&
+            (symbol.contractType === 'PERPETUAL' || symbol.contractType === 'TRADIFI_PERPETUAL') &&
             symbol.status === 'TRADING' &&
             (symbol.quoteAsset === 'USDT' || symbol.quoteAsset === 'USDC')
         )

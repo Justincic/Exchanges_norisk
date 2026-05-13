@@ -42,6 +42,7 @@ describe('exchange adapters', () => {
             json: async () => [
               { symbol: 'BTCUSDT', lastFundingRate: '0.0001', nextFundingTime: 1_800_000_000_000 },
               { symbol: 'ETHUSDC', lastFundingRate: '-0.0001', nextFundingTime: 1_800_000_000_000 },
+              { symbol: 'AAPLUSDT', lastFundingRate: '0.0002', nextFundingTime: 1_800_000_000_000 },
               { symbol: 'BTCUSD_PERP', lastFundingRate: '0.1', nextFundingTime: 1_800_000_000_000 }
             ]
           };
@@ -52,7 +53,8 @@ describe('exchange adapters', () => {
             json: async () => ({
               symbols: [
                 { symbol: 'BTCUSDT', status: 'TRADING', contractType: 'PERPETUAL', quoteAsset: 'USDT' },
-                { symbol: 'ETHUSDC', status: 'TRADING', contractType: 'PERPETUAL', quoteAsset: 'USDC' }
+                { symbol: 'ETHUSDC', status: 'TRADING', contractType: 'PERPETUAL', quoteAsset: 'USDC' },
+                { symbol: 'AAPLUSDT', status: 'TRADING', contractType: 'TRADIFI_PERPETUAL', quoteAsset: 'USDT' }
               ]
             })
           };
@@ -67,7 +69,7 @@ describe('exchange adapters', () => {
     const result = await fetchBinanceMarkets();
 
     expect(result.health.ok).toBe(true);
-    expect(result.markets.map((market) => market.marketSymbol)).toEqual(['BTCUSDT', 'ETHUSDC']);
+    expect(result.markets.map((market) => market.marketSymbol)).toEqual(['BTCUSDT', 'ETHUSDC', 'AAPLUSDT']);
     expect(result.markets.find((market) => market.marketSymbol === 'ETHUSDC')?.intervalHours).toBe(4);
     vi.unstubAllGlobals();
   });
