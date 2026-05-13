@@ -1,0 +1,414 @@
+:root {
+  color: #18201f;
+  background: #f4f7f2;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.shell {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  padding: 28px;
+}
+
+.topbar,
+.summaryBand,
+.controls,
+.tableHeader,
+.opportunityRow {
+  display: grid;
+  gap: 16px;
+}
+
+.topbar {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: #5c6d68;
+  font-size: 0.82rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.iconButton {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid #cbd8d1;
+  border-radius: 8px;
+  color: #24302d;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.summaryBand {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  padding: 18px;
+  border: 1px solid #d8e1dc;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.metric {
+  display: grid;
+  gap: 4px;
+}
+
+.metric span,
+.metric small,
+.field span,
+.exchangeName,
+.tableHeader {
+  color: #657571;
+  font-size: 0.78rem;
+}
+
+.metric strong {
+  font-size: 1.45rem;
+}
+
+.healthStrip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.health {
+  min-width: 42px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.health.ok {
+  color: #0e6249;
+  background: #dff7ea;
+}
+
+.health.bad {
+  color: #8b2f29;
+  background: #ffe7e3;
+}
+
+.controls {
+  grid-template-columns: minmax(220px, 1.5fr) repeat(2, minmax(140px, 0.7fr)) auto auto;
+  align-items: end;
+  margin: 18px 0;
+}
+
+.searchBox,
+.field,
+.toggle {
+  min-height: 44px;
+  border: 1px solid #cfdad4;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+}
+
+.searchBox input,
+.field input,
+.field select {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: #18201f;
+  background: transparent;
+}
+
+.field {
+  display: grid;
+  gap: 3px;
+  padding: 6px 10px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.notice {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border-radius: 8px;
+  color: #365149;
+  background: #e9f1ed;
+}
+
+.notice.error {
+  color: #8b2f29;
+  background: #ffe7e3;
+}
+
+.tableWrap {
+  overflow: hidden;
+  border: 1px solid #d8e1dc;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.tableHeader {
+  grid-template-columns: 140px 1fr 1.65fr;
+  padding: 12px 18px;
+  border-bottom: 1px solid #e2e9e5;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.rows {
+  display: grid;
+}
+
+.opportunityRow {
+  grid-template-columns: 140px 1fr 1.65fr;
+  align-items: center;
+  padding: 18px;
+  border-bottom: 1px solid #edf2ef;
+}
+
+.opportunityRow:last-child {
+  border-bottom: 0;
+}
+
+.assetCell {
+  display: grid;
+  gap: 8px;
+}
+
+.assetCell strong {
+  font-size: 1.5rem;
+}
+
+.quoteNote {
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #56625f;
+  background: #edf2ef;
+  font-size: 0.76rem;
+}
+
+.quoteNote.active {
+  color: #6a4513;
+  background: #fff1d8;
+}
+
+.directionCell {
+  display: grid;
+  gap: 8px;
+}
+
+.directionLine,
+.spreadLine,
+.timeLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.directionLine span,
+.spreadLine span,
+.timeLine span {
+  overflow-wrap: anywhere;
+}
+
+.spreadLine strong {
+  color: #0e6249;
+}
+
+.spreadLine span,
+.timeLine {
+  color: #60706c;
+  font-size: 0.86rem;
+}
+
+.marketGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.exchangeColumn {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 106px;
+}
+
+.exchangeName {
+  font-weight: 800;
+}
+
+.marketPill {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #dfe7e3;
+  border-radius: 8px;
+  background: #fbfdfb;
+}
+
+.pillTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.8rem;
+}
+
+.pillTop span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quoteBadge {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border-radius: 5px;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.quoteBadge.usdt {
+  color: #0c6248;
+  background: #dff7ea;
+}
+
+.quoteBadge.usdc {
+  color: #184f92;
+  background: #e2efff;
+}
+
+.quoteBadge.usd,
+.quoteBadge.unknown {
+  color: #58655f;
+  background: #edf2ef;
+}
+
+.rateBar {
+  position: relative;
+  min-height: 28px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #edf2ef;
+}
+
+.rateBar::before {
+  position: absolute;
+  inset: 0;
+  width: calc((abs(var(--rate)) * 100%) + 12%);
+  max-width: 100%;
+  content: "";
+  background: color-mix(in srgb, #15946b calc(max(var(--rate), 0) * 100%), #c9584a);
+  opacity: 0.18;
+}
+
+.rateValue {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 8px;
+  font-weight: 800;
+}
+
+.positive {
+  color: #0e6249;
+}
+
+.negative {
+  color: #9a382f;
+}
+
+.marketPill small,
+.missing {
+  color: #6d7b77;
+  font-size: 0.76rem;
+}
+
+.missing {
+  display: grid;
+  min-height: 88px;
+  place-items: center;
+  border: 1px dashed #d8e1dc;
+  border-radius: 8px;
+  background: #fbfdfb;
+}
+
+.empty {
+  padding: 32px;
+  color: #657571;
+  text-align: center;
+}
+
+@media (max-width: 1080px) {
+  .summaryBand,
+  .controls,
+  .tableHeader,
+  .opportunityRow {
+    grid-template-columns: 1fr;
+  }
+
+  .tableHeader {
+    display: none;
+  }
+
+  .healthStrip {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell {
+    padding: 18px;
+  }
+
+  .marketGrid {
+    grid-template-columns: 1fr;
+  }
+}
