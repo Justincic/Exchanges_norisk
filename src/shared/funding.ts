@@ -196,7 +196,7 @@ function getMinLiquidityUsd(longMarket: FundingMarket | null, shortMarket: Fundi
 }
 
 function sortMarketsForDisplay(markets: FundingMarket[]) {
-  const order: ExchangeId[] = ['HL', 'OKX', 'BN'];
+  const order: ExchangeId[] = ['HL', 'Lighter', 'OKX', 'BN'];
   return [...markets].sort((a, b) => {
     const exchangeDiff = order.indexOf(a.exchange) - order.indexOf(b.exchange);
     if (exchangeDiff !== 0) return exchangeDiff;

@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { Clock3, Languages, Moon, RefreshCw, Search, Sun, TrendingUp } from 'lucide-react';
+import { Clock3, Languages, Moon, RefreshCw, Search, Sun, TrendingUp, X } from 'lucide-react';
 import { filterMixedQuotes } from './shared/funding';
 import type { ExchangeId, FundingMarket, FundingOpportunity, FundingSnapshot } from './shared/types';
 import './styles.css';
@@ -12,7 +12,7 @@ type Theme = 'light' | 'dark';
 
 const COPY = {
   en: {
-    eyebrow: 'HL / OKX / BN perpetual funding monitor',
+    eyebrow: 'HL / Lighter / OKX / BN perpetual funding monitor',
     title: 'Funding Arbitrage',
     refreshData: 'Refresh funding data',
     bestSpread: 'Best spread',
@@ -25,6 +25,7 @@ const COPY = {
     notLoaded: 'not loaded yet',
     search: 'Search BTC, WTI, TSLA...',
     minApr: 'Min APR spread',
+    minLiquidityFilter: 'Min liquidity',
     sort: 'Sort',
     bestSpreadSort: 'Best spread',
     symbol: 'Symbol',
@@ -63,13 +64,27 @@ const COPY = {
     liquidityOk: 'liquidity ok',
     openInterest: 'OI',
     volume24h: '24h vol',
+    suggestPosition: 'Suggest size',
+    positionSuggestion: 'Position suggestion',
+    suggestedNotional: 'Suggested notional',
+    estimatedPnl: 'Estimated funding PnL',
+    per8h: 'per 8h',
+    perDay: 'per day',
+    per30d: 'per 30d',
+    sizingBasis: 'Sizing basis',
+    longLeg: 'Long leg',
+    shortLeg: 'Short leg',
+    oiShare: 'OI share',
+    volumeShare: '24h vol share',
+    close: 'Close',
+    heuristicNote: 'Heuristic only: caps size at 2% of the thinner leg, max $50k, using OI first and 24h volume as fallback.',
     empty: 'No opportunities match the current filters.',
     now: 'just now',
     secondsAgo: 's ago',
     minutesAgo: 'm ago'
   },
   'zh-TW': {
-    eyebrow: 'HL / OKX / BN 永續資金費率監控',
+    eyebrow: 'HL / Lighter / OKX / BN 永續資金費率監控',
     title: '資金費率套利',
     refreshData: '刷新資金費率資料',
     bestSpread: '最佳價差',
@@ -82,6 +97,7 @@ const COPY = {
     notLoaded: '尚未載入',
     search: '搜尋 BTC, WTI, TSLA...',
     minApr: '最低年化價差',
+    minLiquidityFilter: '最低流動性',
     sort: '排序',
     bestSpreadSort: '最佳價差',
     symbol: '標的',
@@ -120,13 +136,27 @@ const COPY = {
     liquidityOk: '深度可用',
     openInterest: 'OI',
     volume24h: '24h 量',
+    suggestPosition: '建議倉位',
+    positionSuggestion: '倉位建議',
+    suggestedNotional: '建議名目倉位',
+    estimatedPnl: '預估資金費收益',
+    per8h: '每 8h',
+    perDay: '每日',
+    per30d: '30 日',
+    sizingBasis: '估算依據',
+    longLeg: '多單腿',
+    shortLeg: '空單腿',
+    oiShare: 'OI 占比',
+    volumeShare: '24h 量占比',
+    close: '關閉',
+    heuristicNote: '僅為啟發式估算：以較薄一腿的 2% 為上限，最高 $50k，優先用 OI，沒有 OI 時用 24h 量。',
     empty: '目前篩選條件下沒有符合的機會。',
     now: '剛剛',
     secondsAgo: '秒前',
     minutesAgo: '分鐘前'
   },
   'zh-CN': {
-    eyebrow: 'HL / OKX / BN 永续资金费率监控',
+    eyebrow: 'HL / Lighter / OKX / BN 永续资金费率监控',
     title: '资金费率套利',
     refreshData: '刷新资金费率数据',
     bestSpread: '最佳价差',
@@ -139,6 +169,7 @@ const COPY = {
     notLoaded: '尚未加载',
     search: '搜索 BTC, WTI, TSLA...',
     minApr: '最低年化价差',
+    minLiquidityFilter: '最低流动性',
     sort: '排序',
     bestSpreadSort: '最佳价差',
     symbol: '标的',
@@ -177,6 +208,20 @@ const COPY = {
     liquidityOk: '深度可用',
     openInterest: 'OI',
     volume24h: '24h 量',
+    suggestPosition: '建议仓位',
+    positionSuggestion: '仓位建议',
+    suggestedNotional: '建议名义仓位',
+    estimatedPnl: '预估资金费收益',
+    per8h: '每 8h',
+    perDay: '每日',
+    per30d: '30 日',
+    sizingBasis: '估算依据',
+    longLeg: '多单腿',
+    shortLeg: '空单腿',
+    oiShare: 'OI 占比',
+    volumeShare: '24h 量占比',
+    close: '关闭',
+    heuristicNote: '仅为启发式估算：以较薄一腿的 2% 为上限，最高 $50k，优先用 OI，没有 OI 时用 24h 量。',
     empty: '当前筛选条件下没有符合的机会。',
     now: '刚刚',
     secondsAgo: '秒前',
@@ -190,12 +235,14 @@ function App() {
   const [loading, setLoading] = React.useState(true);
   const [query, setQuery] = React.useState('');
   const [minApr, setMinApr] = React.useState(0);
+  const [minLiquidityUsd, setMinLiquidityUsd] = React.useState(5_000_000);
   const [sortKey, setSortKey] = React.useState<SortKey>('spread');
   const [includeMixedQuotes, setIncludeMixedQuotes] = React.useState(true);
   const [language, setLanguage] = React.useState<Language>('zh-TW');
   const [theme, setTheme] = React.useState<Theme>('dark');
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = React.useState(false);
+  const [sizingOpportunity, setSizingOpportunity] = React.useState<FundingOpportunity | null>(null);
   const t = COPY[language];
 
   const loadSnapshot = React.useCallback(async (forceRefresh = false) => {
@@ -227,10 +274,11 @@ function App() {
   const opportunities = React.useMemo(() => {
     const rows = filterMixedQuotes(snapshot?.opportunities ?? [], includeMixedQuotes)
       .filter((opportunity) => opportunity.baseSymbol.includes(query.trim().toUpperCase()))
-      .filter((opportunity) => opportunity.spreadAnnualized * 100 >= minApr);
+      .filter((opportunity) => opportunity.spreadAnnualized * 100 >= minApr)
+      .filter((opportunity) => (opportunity.minLiquidityUsd ?? 0) >= minLiquidityUsd);
 
     return sortOpportunities(rows, sortKey);
-  }, [includeMixedQuotes, minApr, query, snapshot, sortKey]);
+  }, [includeMixedQuotes, minApr, minLiquidityUsd, query, snapshot, sortKey]);
 
   const topOpportunity = opportunities[0];
 
@@ -301,7 +349,7 @@ function App() {
           helper={snapshot ? `${t.updated} ${formatRelativeTime(snapshot.generatedAt, t)}` : t.notLoaded}
         />
         <div className="healthStrip">
-          {(snapshot?.health ?? ['HL', 'OKX', 'BN'].map((exchange) => ({ exchange, ok: false, lastUpdatedAt: null }))).map(
+          {(snapshot?.health ?? (['HL', 'Lighter', 'OKX', 'BN'] as ExchangeId[]).map((exchange) => ({ exchange, ok: false, lastUpdatedAt: null }))).map(
             (item) => (
               <span className={item.ok ? 'health ok' : 'health bad'} key={item.exchange}>
                 {item.exchange}
@@ -328,6 +376,16 @@ function App() {
             step="1"
             value={minApr}
             onChange={(event) => setMinApr(Number(event.target.value))}
+          />
+        </label>
+        <label className="field">
+          <span>{t.minLiquidityFilter}</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={minLiquidityUsd / 1_000_000}
+            onChange={(event) => setMinLiquidityUsd(Number(event.target.value) * 1_000_000)}
           />
         </label>
         <label className="field">
@@ -364,6 +422,7 @@ function App() {
               key={opportunity.baseSymbol}
               opportunity={opportunity}
               t={t}
+              onSuggestPosition={setSizingOpportunity}
             />
           ))}
           {!loading && opportunities.length === 0 ? (
@@ -371,6 +430,14 @@ function App() {
           ) : null}
         </div>
       </section>
+
+      {sizingOpportunity ? (
+        <PositionSuggestionModal
+          opportunity={sizingOpportunity}
+          t={t}
+          onClose={() => setSizingOpportunity(null)}
+        />
+      ) : null}
     </main>
   );
 }
@@ -387,10 +454,12 @@ function Metric({ label, value, helper }: { label: string; value: string; helper
 
 function OpportunityRow({
   opportunity,
-  t
+  t,
+  onSuggestPosition
 }: {
   opportunity: FundingOpportunity;
   t: (typeof COPY)[Language];
+  onSuggestPosition: (opportunity: FundingOpportunity) => void;
 }) {
   return (
     <article className="opportunityRow">
@@ -406,7 +475,7 @@ function OpportunityRow({
           {opportunity.isSettlementAligned ? t.aligned : t.timingRisk}
         </span>
         <span className={opportunity.hasLiquidityWarning ? 'quoteNote risk' : 'quoteNote good'}>
-          {opportunity.hasLiquidityWarning ? t.liquidityRisk : t.liquidityOk}
+          {opportunity.hasLiquidityWarning ? `! ${t.liquidityRisk}` : t.liquidityOk}
         </span>
       </div>
 
@@ -438,10 +507,13 @@ function OpportunityRow({
           <span>{t.priceSpread} {formatNullablePercent(opportunity.priceSpreadPct)}</span>
           <span>{t.minLiquidity} {formatUsdCompact(opportunity.minLiquidityUsd)}</span>
         </div>
+        <button className="secondaryButton" type="button" onClick={() => onSuggestPosition(opportunity)}>
+          {t.suggestPosition}
+        </button>
       </div>
 
       <div className="marketGrid">
-        {(['HL', 'OKX', 'BN'] as ExchangeId[]).map((exchange) => (
+        {(['HL', 'Lighter', 'OKX', 'BN'] as ExchangeId[]).map((exchange) => (
           <ExchangeColumn
             key={exchange}
             exchange={exchange}
@@ -451,6 +523,80 @@ function OpportunityRow({
         ))}
       </div>
     </article>
+  );
+}
+
+function PositionSuggestionModal({
+  opportunity,
+  t,
+  onClose
+}: {
+  opportunity: FundingOpportunity;
+  t: (typeof COPY)[Language];
+  onClose: () => void;
+}) {
+  const sizing = calculatePositionSuggestion(opportunity);
+
+  return (
+    <div className="modalBackdrop" role="presentation" onClick={onClose}>
+      <section className="modalPanel" role="dialog" aria-modal="true" aria-label={t.positionSuggestion} onClick={(event) => event.stopPropagation()}>
+        <div className="modalHeader">
+          <div>
+            <span className="modalKicker">{opportunity.baseSymbol}</span>
+            <h2>{t.positionSuggestion}</h2>
+          </div>
+          <button className="iconButton compactIcon" type="button" onClick={onClose} aria-label={t.close}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="sizingHero">
+          <span>{t.suggestedNotional}</span>
+          <strong>{formatUsdFull(sizing.notionalUsd)}</strong>
+          <small>{t.sizingBasis}: {formatUsdCompact(sizing.basisUsd)}</small>
+        </div>
+
+        <div className="pnlGrid">
+          <Metric label={`${t.estimatedPnl} ${t.per8h}`} value={formatUsdFull(sizing.pnl8hUsd)} helper={formatPercent(opportunity.spreadPerPeriod)} />
+          <Metric label={`${t.estimatedPnl} ${t.perDay}`} value={formatUsdFull(sizing.pnlDayUsd)} helper={formatPercent(opportunity.spreadPerPeriod * 3)} />
+          <Metric label={`${t.estimatedPnl} ${t.per30d}`} value={formatUsdFull(sizing.pnl30dUsd)} helper={formatPercent(opportunity.spreadPerPeriod * 90)} />
+        </div>
+
+        <div className="legGrid">
+          <SizingLeg title={t.longLeg} market={opportunity.longMarket} notionalUsd={sizing.notionalUsd} t={t} />
+          <SizingLeg title={t.shortLeg} market={opportunity.shortMarket} notionalUsd={sizing.notionalUsd} t={t} />
+        </div>
+
+        <p className="modalNote">{t.heuristicNote}</p>
+      </section>
+    </div>
+  );
+}
+
+function SizingLeg({
+  title,
+  market,
+  notionalUsd,
+  t
+}: {
+  title: string;
+  market: FundingMarket | null;
+  notionalUsd: number | null;
+  t: (typeof COPY)[Language];
+}) {
+  return (
+    <div className="sizingLeg">
+      <span>{title}</span>
+      <strong>{formatMarketName(market)}</strong>
+      <div>
+        <small>{t.openInterest}: {formatUsdCompact(market?.openInterestUsd ?? null)}</small>
+        <small>{t.oiShare}: {formatShare(notionalUsd, market?.openInterestUsd ?? null)}</small>
+      </div>
+      <div>
+        <small>{t.volume24h}: {formatUsdCompact(market?.volume24hUsd ?? null)}</small>
+        <small>{t.volumeShare}: {formatShare(notionalUsd, market?.volume24hUsd ?? null)}</small>
+      </div>
+    </div>
   );
 }
 
@@ -538,6 +684,20 @@ function formatUsdCompact(value: number | null) {
   }).format(value);
 }
 
+function formatUsdFull(value: number | null) {
+  if (value === null) return '--';
+  return new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 2,
+    style: 'currency',
+    currency: 'USD'
+  }).format(value);
+}
+
+function formatShare(notionalUsd: number | null, basisUsd: number | null) {
+  if (notionalUsd === null || !basisUsd || basisUsd <= 0) return '--';
+  return formatPercent(notionalUsd / basisUsd);
+}
+
 function formatDateTime(time: number | null) {
   if (!time) return '--';
   return new Intl.DateTimeFormat(undefined, {
@@ -566,6 +726,32 @@ function formatDuration(durationMs: number | null) {
 
 function clampRate(value: number) {
   return Math.max(-1, Math.min(1, value * 10));
+}
+
+function calculatePositionSuggestion(opportunity: FundingOpportunity) {
+  const basisUsd = getSizingBasisUsd(opportunity.longMarket, opportunity.shortMarket);
+  const notionalUsd = basisUsd === null ? null : Math.min(50_000, Math.max(0, basisUsd * 0.02));
+  const usableNotionalUsd = notionalUsd ?? 0;
+
+  return {
+    basisUsd,
+    notionalUsd,
+    pnl8hUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod,
+    pnlDayUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod * 3,
+    pnl30dUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod * 90
+  };
+}
+
+function getSizingBasisUsd(longMarket: FundingMarket | null, shortMarket: FundingMarket | null) {
+  const openInterestValues = [longMarket?.openInterestUsd, shortMarket?.openInterestUsd].filter(
+    (value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0
+  );
+  if (openInterestValues.length === 2) return Math.min(...openInterestValues);
+
+  const liquidityValues = [longMarket?.liquidityScoreUsd, shortMarket?.liquidityScoreUsd].filter(
+    (value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0
+  );
+  return liquidityValues.length ? Math.min(...liquidityValues) : null;
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

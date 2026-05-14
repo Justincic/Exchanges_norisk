@@ -12,7 +12,7 @@ export type ExchangeFetchResult = {
 };
 
 export async function fetchAllExchangeMarkets(): Promise<ExchangeFetchResult[]> {
-  return Promise.all([fetchHyperliquidMarkets(), fetchBinanceMarkets(), fetchOkxMarkets()]);
+  return Promise.all([fetchHyperliquidMarkets(), fetchLighterMarkets(), fetchBinanceMarkets(), fetchOkxMarkets()]);
 }
 
 export async function fetchHyperliquidMarkets(): Promise<ExchangeFetchResult> {
@@ -150,6 +150,50 @@ export async function fetchBinanceMarkets(): Promise<ExchangeFetchResult> {
           });
         }
       )
+      .filter((market) => Number.isFinite(market.fundingRate));
+
+    return {
+      markets,
+      health: { exchange, ok: true, lastUpdatedAt: startedAt }
+    };
+  } catch (error) {
+    return failure(exchange, error);
+  }
+}
+
+export async function fetchLighterMarkets(): Promise<ExchangeFetchResult> {
+  const exchange: ExchangeId = 'Lighter';
+  const startedAt = Date.now();
+
+  try {
+    const [fundingRates, orderBooks, exchangeStats] = await Promise.all([
+      fetchJson<LighterFundingRates>('https://mainnet.zklighter.elliot.ai/api/v1/funding-rates'),
+      fetchJson<LighterOrderBooks>('https://mainnet.zklighter.elliot.ai/api/v1/orderBooks'),
+      fetchJson<LighterExchangeStats>('https://mainnet.zklighter.elliot.ai/api/v1/exchangeStats')
+    ]);
+    const activeSymbols = new Set(
+      orderBooks.order_books
+        .filter((orderBook) => orderBook.market_type === 'perp' && orderBook.status === 'active')
+        .map((orderBook) => orderBook.symbol)
+    );
+    const statsBySymbol = new Map(exchangeStats.order_book_stats.map((stats) => [stats.symbol, stats]));
+
+    const markets = fundingRates.funding_rates
+      .filter((row) => row.exchange === 'lighter')
+      .filter((row) => activeSymbols.has(row.symbol))
+      .map((row) => {
+        const stats = statsBySymbol.get(row.symbol);
+        return createFundingMarket({
+          marketSymbol: `${row.symbol}-USDC`,
+          exchange,
+          fundingRate: Number(row.rate),
+          nextFundingTime: nextHourlyFundingTime(startedAt),
+          intervalHours: 1,
+          markPrice: Number(stats?.last_trade_price),
+          volume24hUsd: Number(stats?.daily_quote_token_volume),
+          sourceUpdatedAt: startedAt
+        });
+      })
       .filter((market) => Number.isFinite(market.fundingRate));
 
     return {
@@ -335,6 +379,34 @@ type BinanceFundingInfo = {
 type BinanceTicker24h = {
   symbol: string;
   quoteVolume: string;
+};
+
+type LighterFundingRates = {
+  code: number;
+  funding_rates: Array<{
+    market_id: number;
+    exchange: string;
+    symbol: string;
+    rate: number;
+  }>;
+};
+
+type LighterOrderBooks = {
+  code: number;
+  order_books: Array<{
+    symbol: string;
+    market_type: string;
+    status: string;
+  }>;
+};
+
+type LighterExchangeStats = {
+  code: number;
+  order_book_stats: Array<{
+    symbol: string;
+    last_trade_price: number;
+    daily_quote_token_volume: number;
+  }>;
 };
 
 type OkxResponse<T> = {

@@ -1,4 +1,4 @@
-export type ExchangeId = 'HL' | 'OKX' | 'BN';
+export type ExchangeId = 'HL' | 'Lighter' | 'OKX' | 'BN';
 export type QuoteAsset = 'USDT' | 'USDC' | 'USD' | 'UNKNOWN';
 
 export type FundingMarket = {

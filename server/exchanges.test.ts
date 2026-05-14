@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fetchBinanceMarkets, fetchHyperliquidMarkets } from './exchanges';
+import { fetchBinanceMarkets, fetchHyperliquidMarkets, fetchLighterMarkets } from './exchanges';
 
 describe('exchange adapters', () => {
   it('normalizes Hyperliquid core funding rows with price and liquidity', async () => {
@@ -120,6 +120,62 @@ describe('exchange adapters', () => {
     expect(result.health.ok).toBe(true);
     expect(result.markets.map((market) => market.marketSymbol)).toEqual(['BTCUSDT', 'ETHUSDC', 'AAPLUSDT']);
     expect(result.markets.find((market) => market.marketSymbol === 'ETHUSDC')?.intervalHours).toBe(4);
+    vi.unstubAllGlobals();
+  });
+
+  it('normalizes Lighter funding rows with price and volume', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('funding-rates')) {
+          return {
+            ok: true,
+            json: async () => ({
+              code: 200,
+              funding_rates: [
+                { market_id: 113, exchange: 'binance', symbol: 'AAPL', rate: 0.999 },
+                { market_id: 113, exchange: 'lighter', symbol: 'AAPL', rate: 0.00012 },
+                { market_id: 999, exchange: 'lighter', symbol: 'INACTIVE', rate: 0.0005 }
+              ]
+            })
+          };
+        }
+        if (url.includes('orderBooks')) {
+          return {
+            ok: true,
+            json: async () => ({
+              code: 200,
+              order_books: [
+                { symbol: 'AAPL', market_type: 'perp', status: 'active' },
+                { symbol: 'INACTIVE', market_type: 'perp', status: 'delisted' }
+              ]
+            })
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            code: 200,
+            order_book_stats: [
+              { symbol: 'AAPL', last_trade_price: 290.25, daily_quote_token_volume: 12_000_000 }
+            ]
+          })
+        };
+      })
+    );
+
+    const result = await fetchLighterMarkets();
+
+    expect(result.health.ok).toBe(true);
+    expect(result.markets).toHaveLength(1);
+    expect(result.markets[0]).toMatchObject({
+      exchange: 'Lighter',
+      baseSymbol: 'AAPL',
+      marketSymbol: 'AAPL-USDC',
+      fundingRate: 0.00012,
+      markPrice: 290.25,
+      volume24hUsd: 12_000_000
+    });
     vi.unstubAllGlobals();
   });
 });
