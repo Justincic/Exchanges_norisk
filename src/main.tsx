@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Clock3, Languages, Moon, RefreshCw, Search, Sun, TrendingUp, X } from 'lucide-react';
-import { filterMixedQuotes } from './shared/funding';
+import { buildOpportunities, filterMixedQuotes } from './shared/funding';
 import type { ExchangeId, FundingMarket, FundingOpportunity, FundingSnapshot } from './shared/types';
 import './styles.css';
 
@@ -19,6 +19,13 @@ type ExchangeFeeConfig = {
 type FeeConfig = {
   byExchange: Record<ExchangeId, ExchangeFeeConfig>;
 };
+type StrategyFilters = {
+  enabledExchanges: Record<ExchangeId, boolean>;
+  requireAlignedFunding: boolean;
+  requireLiquidityOk: boolean;
+  minLegOpenInterestUsd: number;
+  minLegVolume24hUsd: number;
+};
 
 const EXCHANGES: ExchangeId[] = ['HL', 'Lighter', 'OKX', 'BN', 'Aster'];
 const CEX_EXCHANGES = ['BN', 'OKX', 'Aster'] as const;
@@ -31,6 +38,19 @@ const DEFAULT_FEE_CONFIG: FeeConfig = {
     BN: { side: 'taker', discountPct: 0, vipLevel: 'VIP0' },
     Aster: { side: 'taker', discountPct: 0, vipLevel: 'VIP0' }
   }
+};
+const DEFAULT_STRATEGY_FILTERS: StrategyFilters = {
+  enabledExchanges: {
+    HL: true,
+    Lighter: true,
+    OKX: true,
+    BN: true,
+    Aster: true
+  },
+  requireAlignedFunding: false,
+  requireLiquidityOk: false,
+  minLegOpenInterestUsd: 0,
+  minLegVolume24hUsd: 0
 };
 const FEE_RATES: Record<ExchangeId, Record<VipLevel, Record<FeeSide, number>>> = {
   HL: makeFlatFees(0.0001, 0.00035),
@@ -77,6 +97,14 @@ const COPY = {
     search: 'Search BTC, WTI, TSLA...',
     minApr: 'Min APR spread',
     minLiquidityFilter: 'Min liquidity',
+    strategyFilters: 'Strategy filters',
+    availableExchanges: 'Available exchanges',
+    riskFilters: 'Risk filters',
+    noTimingRisk: 'No timing risk',
+    onlyLiquidityOk: 'Only liquidity ok',
+    minLegOi: 'Min leg OI',
+    minLegVolume: 'Min leg 24h vol',
+    filterUnitMillions: 'USD millions',
     feeSettings: 'Fee settings',
     feeSide: 'Execution',
     maker: 'Maker',
@@ -162,6 +190,14 @@ const COPY = {
     search: '搜尋 BTC, WTI, TSLA...',
     minApr: '最低年化價差',
     minLiquidityFilter: '最低流動性',
+    strategyFilters: '策略篩選',
+    availableExchanges: '可用交易所',
+    riskFilters: '風險條件',
+    noTimingRisk: '排除時間風險',
+    onlyLiquidityOk: '只看深度可用',
+    minLegOi: '單腿最低 OI',
+    minLegVolume: '單腿最低 24h 量',
+    filterUnitMillions: '百萬美元',
     feeSettings: '手續費設定',
     feeSide: '成交方式',
     maker: 'Maker',
@@ -247,6 +283,14 @@ const COPY = {
     search: '搜索 BTC, WTI, TSLA...',
     minApr: '最低年化价差',
     minLiquidityFilter: '最低流动性',
+    strategyFilters: '策略筛选',
+    availableExchanges: '可用交易所',
+    riskFilters: '风险条件',
+    noTimingRisk: '排除时间风险',
+    onlyLiquidityOk: '只看深度可用',
+    minLegOi: '单腿最低 OI',
+    minLegVolume: '单腿最低 24h 量',
+    filterUnitMillions: '百万美元',
     feeSettings: '手续费设置',
     feeSide: '成交方式',
     maker: 'Maker',
@@ -335,6 +379,7 @@ function App() {
   const [sizingOpportunity, setSizingOpportunity] = React.useState<FundingOpportunity | null>(null);
   const [feeConfig, setFeeConfig] = React.useState<FeeConfig>(DEFAULT_FEE_CONFIG);
   const [activeFeeExchange, setActiveFeeExchange] = React.useState<ExchangeId>('BN');
+  const [strategyFilters, setStrategyFilters] = React.useState<StrategyFilters>(DEFAULT_STRATEGY_FILTERS);
   const t = COPY[language];
 
   const loadSnapshot = React.useCallback(async (forceRefresh = false) => {
@@ -364,13 +409,17 @@ function App() {
   }, [language, theme]);
 
   const opportunities = React.useMemo(() => {
-    const rows = filterMixedQuotes(snapshot?.opportunities ?? [], includeMixedQuotes)
+    const filteredMarkets = (snapshot?.opportunities ?? [])
+      .flatMap((opportunity) => opportunity.markets)
+      .filter((market) => strategyFilters.enabledExchanges[market.exchange]);
+    const rows = filterMixedQuotes(buildOpportunities(filteredMarkets), includeMixedQuotes)
       .filter((opportunity) => opportunity.baseSymbol.includes(query.trim().toUpperCase()))
       .filter((opportunity) => minApr <= 0 || calculateFeeImpact(opportunity, feeConfig).netAnnualized * 100 >= minApr)
-      .filter((opportunity) => (opportunity.minLiquidityUsd ?? 0) >= minLiquidityUsd);
+      .filter((opportunity) => (opportunity.minLiquidityUsd ?? 0) >= minLiquidityUsd)
+      .filter((opportunity) => passesStrategyFilters(opportunity, strategyFilters));
 
     return sortOpportunities(rows, sortKey, feeConfig);
-  }, [feeConfig, includeMixedQuotes, minApr, minLiquidityUsd, query, snapshot, sortKey]);
+  }, [feeConfig, includeMixedQuotes, minApr, minLiquidityUsd, query, snapshot, sortKey, strategyFilters]);
 
   const topOpportunity = opportunities[0];
   const topFeeImpact = topOpportunity ? calculateFeeImpact(topOpportunity, feeConfig) : null;
@@ -433,7 +482,7 @@ function App() {
         />
         <Metric
           label={t.markets}
-          value={String(snapshot?.opportunities.reduce((sum, item) => sum + item.markets.length, 0) ?? 0)}
+          value={String(opportunities.reduce((sum, item) => sum + item.markets.length, 0))}
           helper={t.normalizedMarkets}
         />
         <Metric
@@ -527,6 +576,85 @@ function App() {
           />
           <span>{t.mixQuotes}</span>
         </label>
+      </section>
+
+      <section className="strategyPanel" aria-label={t.strategyFilters}>
+        <div className="filterIntro">
+          <strong>{t.strategyFilters}</strong>
+          <small>{t.availableExchanges}</small>
+        </div>
+        <div className="exchangeFilterTabs">
+          {EXCHANGES.map((exchange) => (
+            <button
+              className={strategyFilters.enabledExchanges[exchange] ? 'exchangeFilterButton active' : 'exchangeFilterButton'}
+              key={exchange}
+              type="button"
+              onClick={() =>
+                setStrategyFilters((current) => ({
+                  ...current,
+                  enabledExchanges: {
+                    ...current.enabledExchanges,
+                    [exchange]: !current.enabledExchanges[exchange]
+                  }
+                }))
+              }
+            >
+              {exchange}
+            </button>
+          ))}
+        </div>
+        <div className="riskFilterGroup">
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={strategyFilters.requireAlignedFunding}
+              onChange={(event) =>
+                setStrategyFilters((current) => ({ ...current, requireAlignedFunding: event.target.checked }))
+              }
+            />
+            <span>{t.noTimingRisk}</span>
+          </label>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={strategyFilters.requireLiquidityOk}
+              onChange={(event) =>
+                setStrategyFilters((current) => ({ ...current, requireLiquidityOk: event.target.checked }))
+              }
+            />
+            <span>{t.onlyLiquidityOk}</span>
+          </label>
+          <label className="field compactField">
+            <span>{t.minLegOi}</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={strategyFilters.minLegOpenInterestUsd / 1_000_000}
+              onChange={(event) =>
+                setStrategyFilters((current) => ({
+                  ...current,
+                  minLegOpenInterestUsd: clampNumber(Number(event.target.value), 0, 1_000_000) * 1_000_000
+                }))
+              }
+            />
+          </label>
+          <label className="field compactField">
+            <span>{t.minLegVolume}</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={strategyFilters.minLegVolume24hUsd / 1_000_000}
+              onChange={(event) =>
+                setStrategyFilters((current) => ({
+                  ...current,
+                  minLegVolume24hUsd: clampNumber(Number(event.target.value), 0, 1_000_000) * 1_000_000
+                }))
+              }
+            />
+          </label>
+        </div>
       </section>
 
       {error ? <div className="notice error">{t.snapshotError}: {error}</div> : null}
@@ -848,6 +976,25 @@ function sortOpportunities(rows: FundingOpportunity[], sortKey: SortKey, feeConf
     if (sortKey === 'freshness') return newestSource(b) - newestSource(a);
     return calculateFeeImpact(b, feeConfig).netAnnualized - calculateFeeImpact(a, feeConfig).netAnnualized;
   });
+}
+
+function passesStrategyFilters(opportunity: FundingOpportunity, filters: StrategyFilters) {
+  if (filters.requireAlignedFunding && !opportunity.isSettlementAligned) return false;
+  if (filters.requireLiquidityOk && opportunity.hasLiquidityWarning) return false;
+  if (filters.minLegOpenInterestUsd > 0) {
+    const minOi = getMinPairValue(opportunity.longMarket?.openInterestUsd ?? null, opportunity.shortMarket?.openInterestUsd ?? null);
+    if (minOi === null || minOi < filters.minLegOpenInterestUsd) return false;
+  }
+  if (filters.minLegVolume24hUsd > 0) {
+    const minVolume = getMinPairValue(opportunity.longMarket?.volume24hUsd ?? null, opportunity.shortMarket?.volume24hUsd ?? null);
+    if (minVolume === null || minVolume < filters.minLegVolume24hUsd) return false;
+  }
+  return true;
+}
+
+function getMinPairValue(first: number | null, second: number | null) {
+  const values = [first, second].filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  return values.length === 2 ? Math.min(...values) : null;
 }
 
 function newestSource(opportunity: FundingOpportunity) {

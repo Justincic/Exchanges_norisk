@@ -210,6 +210,61 @@ h1 {
   margin: 18px 0;
 }
 
+.strategyPanel {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.65fr) minmax(280px, 0.8fr) minmax(420px, 1.4fr);
+  align-items: stretch;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.filterIntro {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+}
+
+.filterIntro strong {
+  font-size: 1rem;
+}
+
+.filterIntro small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.exchangeFilterTabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.exchangeFilterButton {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted-strong);
+  background: var(--surface-soft);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.exchangeFilterButton.active {
+  color: var(--text);
+  border-color: var(--positive);
+  background: var(--positive-soft);
+}
+
+.riskFilterGroup {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .feePanel {
   display: grid;
   grid-template-columns: minmax(220px, 0.9fr) minmax(320px, 1.3fr) minmax(280px, 1fr);
@@ -761,6 +816,7 @@ h1 {
   .summaryBand,
   .controls,
   .feePanel,
+  .strategyPanel,
   .tableHeader,
   .opportunityRow {
     grid-template-columns: 1fr;
@@ -783,11 +839,13 @@ h1 {
   .marketGrid,
   .pnlGrid,
   .legGrid,
-  .exchangeFeeEditor {
+  .exchangeFeeEditor,
+  .riskFilterGroup {
     grid-template-columns: 1fr;
   }
 
-  .exchangeFeeTabs {
+  .exchangeFeeTabs,
+  .exchangeFilterTabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
