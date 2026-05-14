@@ -23,9 +23,6 @@ type StrategyFilters = {
   enabledExchanges: Record<ExchangeId, boolean>;
   requireAlignedFunding: boolean;
   requireLiquidityOk: boolean;
-  plannedNotionalUsd: number;
-  maxOiSharePct: number;
-  minVolumeMultiplier: number;
 };
 
 const EXCHANGES: ExchangeId[] = ['HL', 'Lighter', 'OKX', 'BN', 'Aster'];
@@ -49,14 +46,8 @@ const DEFAULT_STRATEGY_FILTERS: StrategyFilters = {
     Aster: true
   },
   requireAlignedFunding: false,
-  requireLiquidityOk: true,
-  plannedNotionalUsd: 25_000,
-  maxOiSharePct: 2,
-  minVolumeMultiplier: 20
+  requireLiquidityOk: true
 };
-const NOTIONAL_OPTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000, 500_000, 1_000_000];
-const OI_SHARE_OPTIONS = [0.5, 1, 2, 5, 10];
-const VOLUME_MULTIPLIER_OPTIONS = [0, 10, 20, 50, 100];
 const FEE_RATES: Record<ExchangeId, Record<VipLevel, Record<FeeSide, number>>> = {
   HL: makeFlatFees(0.0001, 0.00035),
   Lighter: makeFlatFees(0, 0.0002),
@@ -108,10 +99,6 @@ const COPY = {
     riskFilters: 'Risk filters',
     noTimingRisk: 'No timing risk',
     onlyLiquidityOk: 'Only liquidity ok',
-    plannedNotional: 'Position size',
-    maxOiShare: 'Max OI share',
-    volumeBuffer: '24h volume buffer',
-    disabled: 'Disabled',
     filterUnitMillions: 'USD millions',
     feeSettings: 'Fee settings',
     feeSide: 'Execution',
@@ -164,20 +151,6 @@ const COPY = {
     liquidityOk: 'liquidity ok',
     openInterest: 'OI',
     volume24h: '24h vol',
-    suggestPosition: 'Suggest size',
-    positionSuggestion: 'Position suggestion',
-    suggestedNotional: 'Suggested notional',
-    estimatedPnl: 'Estimated funding PnL',
-    per8h: 'per 8h',
-    perDay: 'per day',
-    per30d: 'per 30d',
-    sizingBasis: 'Sizing basis',
-    longLeg: 'Long leg',
-    shortLeg: 'Short leg',
-    oiShare: 'OI share',
-    volumeShare: '24h vol share',
-    close: 'Close',
-    heuristicNote: 'Heuristic only: starts from your selected position size, then caps it by OI share and 24h volume buffer when data is available.',
     empty: 'No opportunities match the current filters.',
     now: 'just now',
     secondsAgo: 's ago',
@@ -204,10 +177,6 @@ const COPY = {
     riskFilters: '風險條件',
     noTimingRisk: '排除時間風險',
     onlyLiquidityOk: '只看深度可用',
-    plannedNotional: '預計倉位',
-    maxOiShare: 'OI 占比上限',
-    volumeBuffer: '24h 量緩衝',
-    disabled: '不啟用',
     filterUnitMillions: '百萬美元',
     feeSettings: '手續費設定',
     feeSide: '成交方式',
@@ -260,20 +229,6 @@ const COPY = {
     liquidityOk: '深度可用',
     openInterest: 'OI',
     volume24h: '24h 量',
-    suggestPosition: '建議倉位',
-    positionSuggestion: '倉位建議',
-    suggestedNotional: '建議名目倉位',
-    estimatedPnl: '預估資金費收益',
-    per8h: '每 8h',
-    perDay: '每日',
-    per30d: '30 日',
-    sizingBasis: '估算依據',
-    longLeg: '多單腿',
-    shortLeg: '空單腿',
-    oiShare: 'OI 占比',
-    volumeShare: '24h 量占比',
-    close: '關閉',
-    heuristicNote: '僅為啟發式估算：以你選的預計倉位為目標，再依 OI 占比與 24h 量緩衝限制，資料缺失時不硬砍倉位。',
     empty: '目前篩選條件下沒有符合的機會。',
     now: '剛剛',
     secondsAgo: '秒前',
@@ -300,10 +255,6 @@ const COPY = {
     riskFilters: '风险条件',
     noTimingRisk: '排除时间风险',
     onlyLiquidityOk: '只看深度可用',
-    plannedNotional: '预计仓位',
-    maxOiShare: 'OI 占比上限',
-    volumeBuffer: '24h 量缓冲',
-    disabled: '不启用',
     filterUnitMillions: '百万美元',
     feeSettings: '手续费设置',
     feeSide: '成交方式',
@@ -356,20 +307,6 @@ const COPY = {
     liquidityOk: '深度可用',
     openInterest: 'OI',
     volume24h: '24h 量',
-    suggestPosition: '建议仓位',
-    positionSuggestion: '仓位建议',
-    suggestedNotional: '建议名义仓位',
-    estimatedPnl: '预估资金费收益',
-    per8h: '每 8h',
-    perDay: '每日',
-    per30d: '30 日',
-    sizingBasis: '估算依据',
-    longLeg: '多单腿',
-    shortLeg: '空单腿',
-    oiShare: 'OI 占比',
-    volumeShare: '24h 量占比',
-    close: '关闭',
-    heuristicNote: '仅为启发式估算：以你选的预计仓位为目标，再依 OI 占比与 24h 量缓冲限制，数据缺失时不硬砍仓位。',
     empty: '当前筛选条件下没有符合的机会。',
     now: '刚刚',
     secondsAgo: '秒前',
@@ -390,7 +327,6 @@ function App() {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = React.useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = React.useState(false);
-  const [sizingOpportunity, setSizingOpportunity] = React.useState<FundingOpportunity | null>(null);
   const [feeConfig, setFeeConfig] = React.useState<FeeConfig>(DEFAULT_FEE_CONFIG);
   const [activeFeeExchange, setActiveFeeExchange] = React.useState<ExchangeId>('BN');
   const [strategyFilters, setStrategyFilters] = React.useState<StrategyFilters>(DEFAULT_STRATEGY_FILTERS);
@@ -605,56 +541,6 @@ function App() {
                 />
                 <span>{t.onlyLiquidityOk}</span>
               </label>
-              <label className="field compactField">
-                <span>{t.plannedNotional}</span>
-                <select
-                  value={strategyFilters.plannedNotionalUsd}
-                  onChange={(event) =>
-                    setStrategyFilters((current) => ({
-                      ...current,
-                      plannedNotionalUsd: Number(event.target.value)
-                    }))
-                  }
-                >
-                  {NOTIONAL_OPTIONS.map((value) => (
-                    <option value={value} key={value}>{formatUsdCompact(value)}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field compactField">
-                <span>{t.maxOiShare}</span>
-                <select
-                  value={strategyFilters.maxOiSharePct}
-                  onChange={(event) =>
-                    setStrategyFilters((current) => ({
-                      ...current,
-                      maxOiSharePct: Number(event.target.value)
-                    }))
-                  }
-                >
-                  {OI_SHARE_OPTIONS.map((value) => (
-                    <option value={value} key={value}>{value}%</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field compactField">
-                <span>{t.volumeBuffer}</span>
-                <select
-                  value={strategyFilters.minVolumeMultiplier}
-                  onChange={(event) =>
-                    setStrategyFilters((current) => ({
-                      ...current,
-                      minVolumeMultiplier: Number(event.target.value)
-                    }))
-                  }
-                >
-                  {VOLUME_MULTIPLIER_OPTIONS.map((value) => (
-                    <option value={value} key={value}>
-                      {value === 0 ? t.disabled : `${value}x`}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
           </section>
 
@@ -705,7 +591,6 @@ function App() {
               opportunity={opportunity}
               t={t}
               feeImpact={calculateFeeImpact(opportunity, feeConfig)}
-              onSuggestPosition={setSizingOpportunity}
             />
           ))}
           {!loading && opportunities.length === 0 ? (
@@ -713,16 +598,6 @@ function App() {
           ) : null}
         </div>
       </section>
-
-      {sizingOpportunity ? (
-        <PositionSuggestionModal
-          opportunity={sizingOpportunity}
-          t={t}
-          feeImpact={calculateFeeImpact(sizingOpportunity, feeConfig)}
-          strategyFilters={strategyFilters}
-          onClose={() => setSizingOpportunity(null)}
-        />
-      ) : null}
     </main>
   );
 }
@@ -806,13 +681,11 @@ function ExchangeFeeEditor({
 function OpportunityRow({
   opportunity,
   t,
-  feeImpact,
-  onSuggestPosition
+  feeImpact
 }: {
   opportunity: FundingOpportunity;
   t: (typeof COPY)[Language];
   feeImpact: FeeImpact;
-  onSuggestPosition: (opportunity: FundingOpportunity) => void;
 }) {
   return (
     <article className="opportunityRow">
@@ -867,9 +740,6 @@ function OpportunityRow({
           <span>{t.priceSpread} {formatNullablePercent(opportunity.priceSpreadPct)}</span>
           <span>{t.minLiquidity} {formatUsdCompact(opportunity.minLiquidityUsd)}</span>
         </div>
-        <button className="secondaryButton" type="button" onClick={() => onSuggestPosition(opportunity)}>
-          {t.suggestPosition}
-        </button>
       </div>
 
       <div className="marketGrid">
@@ -883,84 +753,6 @@ function OpportunityRow({
         ))}
       </div>
     </article>
-  );
-}
-
-function PositionSuggestionModal({
-  opportunity,
-  t,
-  feeImpact,
-  strategyFilters,
-  onClose
-}: {
-  opportunity: FundingOpportunity;
-  t: (typeof COPY)[Language];
-  feeImpact: FeeImpact;
-  strategyFilters: StrategyFilters;
-  onClose: () => void;
-}) {
-  const sizing = calculatePositionSuggestion(opportunity, feeImpact, strategyFilters);
-
-  return (
-    <div className="modalBackdrop" role="presentation" onClick={onClose}>
-      <section className="modalPanel" role="dialog" aria-modal="true" aria-label={t.positionSuggestion} onClick={(event) => event.stopPropagation()}>
-        <div className="modalHeader">
-          <div>
-            <span className="modalKicker">{opportunity.baseSymbol}</span>
-            <h2>{t.positionSuggestion}</h2>
-          </div>
-          <button className="iconButton compactIcon" type="button" onClick={onClose} aria-label={t.close}>
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="sizingHero">
-          <span>{t.suggestedNotional}</span>
-          <strong>{formatUsdFull(sizing.notionalUsd)}</strong>
-          <small>{t.sizingBasis}: {formatUsdCompact(sizing.basisUsd)}</small>
-        </div>
-
-        <div className="pnlGrid">
-          <Metric label={`${t.estimatedPnl} ${t.per8h}`} value={formatUsdFull(sizing.pnl8hUsd)} helper={`${t.netSpread} ${formatPercent(feeImpact.netPerPeriod)}`} />
-          <Metric label={`${t.estimatedPnl} ${t.perDay}`} value={formatUsdFull(sizing.pnlDayUsd)} helper={`${t.roundTripFee} ${formatUsdFull(sizing.feeUsd)}`} />
-          <Metric label={`${t.estimatedPnl} ${t.per30d}`} value={formatUsdFull(sizing.pnl30dUsd)} helper={`${t.breakEven} ${formatBreakEven(feeImpact.breakEvenPeriods, t)}`} />
-        </div>
-
-        <div className="legGrid">
-          <SizingLeg title={t.longLeg} market={opportunity.longMarket} notionalUsd={sizing.notionalUsd} t={t} />
-          <SizingLeg title={t.shortLeg} market={opportunity.shortMarket} notionalUsd={sizing.notionalUsd} t={t} />
-        </div>
-
-        <p className="modalNote">{t.heuristicNote}</p>
-      </section>
-    </div>
-  );
-}
-
-function SizingLeg({
-  title,
-  market,
-  notionalUsd,
-  t
-}: {
-  title: string;
-  market: FundingMarket | null;
-  notionalUsd: number | null;
-  t: (typeof COPY)[Language];
-}) {
-  return (
-    <div className="sizingLeg">
-      <span>{title}</span>
-      <strong>{formatMarketName(market)}</strong>
-      <div>
-        <small>{t.openInterest}: {formatUsdCompact(market?.openInterestUsd ?? null)}</small>
-        <small>{t.oiShare}: {formatShare(notionalUsd, market?.openInterestUsd ?? null)}</small>
-      </div>
-      <div>
-        <small>{t.volume24h}: {formatUsdCompact(market?.volume24hUsd ?? null)}</small>
-        <small>{t.volumeShare}: {formatShare(notionalUsd, market?.volume24hUsd ?? null)}</small>
-      </div>
-    </div>
   );
 }
 
@@ -1020,25 +812,7 @@ function newestSource(opportunity: FundingOpportunity) {
 function passesStrategyFilters(opportunity: FundingOpportunity, filters: StrategyFilters) {
   if (filters.requireAlignedFunding && !opportunity.isSettlementAligned) return false;
   if (filters.requireLiquidityOk && opportunity.hasLiquidityWarning) return false;
-  const requiredOiUsd = filters.plannedNotionalUsd / (filters.maxOiSharePct / 100);
-  const minOi = getMinPairValue(opportunity.longMarket?.openInterestUsd ?? null, opportunity.shortMarket?.openInterestUsd ?? null);
-  if (minOi !== null && minOi < requiredOiUsd) return false;
-
-  if (filters.minVolumeMultiplier > 0) {
-    const minVolume = getMinPairValue(
-      opportunity.longMarket?.volume24hUsd ?? null,
-      opportunity.shortMarket?.volume24hUsd ?? null
-    );
-    const requiredVolumeUsd = filters.plannedNotionalUsd * filters.minVolumeMultiplier;
-    if (minVolume === null || minVolume < requiredVolumeUsd) return false;
-  }
-
   return true;
-}
-
-function getMinPairValue(first: number | null, second: number | null) {
-  const values = [first, second].filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-  return values.length === 2 ? Math.min(...values) : null;
 }
 
 function formatMarketName(market: FundingMarket | null) {
@@ -1070,20 +844,6 @@ function formatUsdCompact(value: number | null) {
     style: 'currency',
     currency: 'USD'
   }).format(value);
-}
-
-function formatUsdFull(value: number | null) {
-  if (value === null) return '--';
-  return new Intl.NumberFormat(undefined, {
-    maximumFractionDigits: 2,
-    style: 'currency',
-    currency: 'USD'
-  }).format(value);
-}
-
-function formatShare(notionalUsd: number | null, basisUsd: number | null) {
-  if (notionalUsd === null || !basisUsd || basisUsd <= 0) return '--';
-  return formatPercent(notionalUsd / basisUsd);
 }
 
 function formatDateTime(time: number | null) {
@@ -1124,40 +884,6 @@ type FeeImpact = {
   netAnnualized: number;
   breakEvenPeriods: number | null;
 };
-
-function calculatePositionSuggestion(
-  opportunity: FundingOpportunity,
-  feeImpact: FeeImpact,
-  strategyFilters: StrategyFilters
-) {
-  const basisUsd = getSizingBasisUsd(opportunity.longMarket, opportunity.shortMarket);
-  const oiCapUsd = basisUsd === null ? null : basisUsd * (strategyFilters.maxOiSharePct / 100);
-  const volumeCapUsd = getVolumeCapUsd(opportunity, strategyFilters);
-  const caps = [strategyFilters.plannedNotionalUsd, oiCapUsd, volumeCapUsd].filter(
-    (value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0
-  );
-  const notionalUsd = caps.length ? Math.min(...caps) : strategyFilters.plannedNotionalUsd;
-  const usableNotionalUsd = notionalUsd ?? 0;
-  const feeUsd = notionalUsd === null ? null : usableNotionalUsd * feeImpact.roundTripFeeRate;
-
-  return {
-    basisUsd,
-    notionalUsd,
-    feeUsd,
-    pnl8hUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod - (feeUsd ?? 0),
-    pnlDayUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod * 3 - (feeUsd ?? 0),
-    pnl30dUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod * 90 - (feeUsd ?? 0)
-  };
-}
-
-function getVolumeCapUsd(opportunity: FundingOpportunity, strategyFilters: StrategyFilters) {
-  if (strategyFilters.minVolumeMultiplier <= 0) return null;
-  const minVolume = getMinPairValue(
-    opportunity.longMarket?.volume24hUsd ?? null,
-    opportunity.shortMarket?.volume24hUsd ?? null
-  );
-  return minVolume === null ? null : minVolume / strategyFilters.minVolumeMultiplier;
-}
 
 function calculateFeeImpact(opportunity: FundingOpportunity, feeConfig: FeeConfig): FeeImpact {
   const longFeeRate = getEffectiveFeeRate(opportunity.longMarket?.exchange ?? null, feeConfig);
@@ -1215,18 +941,6 @@ function clampNumber(value: number, min: number, max: number) {
 function formatBreakEven(value: number | null, t: (typeof COPY)[Language]) {
   if (value === null) return '--';
   return `${value.toFixed(value < 10 ? 1 : 0)} ${t.fundingRounds}`;
-}
-
-function getSizingBasisUsd(longMarket: FundingMarket | null, shortMarket: FundingMarket | null) {
-  const openInterestValues = [longMarket?.openInterestUsd, shortMarket?.openInterestUsd].filter(
-    (value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0
-  );
-  if (openInterestValues.length === 2) return Math.min(...openInterestValues);
-
-  const liquidityValues = [longMarket?.liquidityScoreUsd, shortMarket?.liquidityScoreUsd].filter(
-    (value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0
-  );
-  return liquidityValues.length ? Math.min(...liquidityValues) : null;
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
