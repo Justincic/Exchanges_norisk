@@ -177,7 +177,7 @@ const COPY = {
     oiShare: 'OI share',
     volumeShare: '24h vol share',
     close: 'Close',
-    heuristicNote: 'Heuristic only: caps size at 2% of the thinner leg, max $50k, using OI first and 24h volume as fallback.',
+    heuristicNote: 'Heuristic only: starts from your selected position size, then caps it by OI share and 24h volume buffer when data is available.',
     empty: 'No opportunities match the current filters.',
     now: 'just now',
     secondsAgo: 's ago',
@@ -273,7 +273,7 @@ const COPY = {
     oiShare: 'OI 占比',
     volumeShare: '24h 量占比',
     close: '關閉',
-    heuristicNote: '僅為啟發式估算：以較薄一腿的 2% 為上限，最高 $50k，優先用 OI，沒有 OI 時用 24h 量。',
+    heuristicNote: '僅為啟發式估算：以你選的預計倉位為目標，再依 OI 占比與 24h 量緩衝限制，資料缺失時不硬砍倉位。',
     empty: '目前篩選條件下沒有符合的機會。',
     now: '剛剛',
     secondsAgo: '秒前',
@@ -369,7 +369,7 @@ const COPY = {
     oiShare: 'OI 占比',
     volumeShare: '24h 量占比',
     close: '关闭',
-    heuristicNote: '仅为启发式估算：以较薄一腿的 2% 为上限，最高 $50k，优先用 OI，没有 OI 时用 24h 量。',
+    heuristicNote: '仅为启发式估算：以你选的预计仓位为目标，再依 OI 占比与 24h 量缓冲限制，数据缺失时不硬砍仓位。',
     empty: '当前筛选条件下没有符合的机会。',
     now: '刚刚',
     secondsAgo: '秒前',
@@ -719,6 +719,7 @@ function App() {
           opportunity={sizingOpportunity}
           t={t}
           feeImpact={calculateFeeImpact(sizingOpportunity, feeConfig)}
+          strategyFilters={strategyFilters}
           onClose={() => setSizingOpportunity(null)}
         />
       ) : null}
@@ -889,14 +890,16 @@ function PositionSuggestionModal({
   opportunity,
   t,
   feeImpact,
+  strategyFilters,
   onClose
 }: {
   opportunity: FundingOpportunity;
   t: (typeof COPY)[Language];
   feeImpact: FeeImpact;
+  strategyFilters: StrategyFilters;
   onClose: () => void;
 }) {
-  const sizing = calculatePositionSuggestion(opportunity, feeImpact);
+  const sizing = calculatePositionSuggestion(opportunity, feeImpact, strategyFilters);
 
   return (
     <div className="modalBackdrop" role="presentation" onClick={onClose}>
@@ -1122,9 +1125,18 @@ type FeeImpact = {
   breakEvenPeriods: number | null;
 };
 
-function calculatePositionSuggestion(opportunity: FundingOpportunity, feeImpact: FeeImpact) {
+function calculatePositionSuggestion(
+  opportunity: FundingOpportunity,
+  feeImpact: FeeImpact,
+  strategyFilters: StrategyFilters
+) {
   const basisUsd = getSizingBasisUsd(opportunity.longMarket, opportunity.shortMarket);
-  const notionalUsd = basisUsd === null ? null : Math.min(50_000, Math.max(0, basisUsd * 0.02));
+  const oiCapUsd = basisUsd === null ? null : basisUsd * (strategyFilters.maxOiSharePct / 100);
+  const volumeCapUsd = getVolumeCapUsd(opportunity, strategyFilters);
+  const caps = [strategyFilters.plannedNotionalUsd, oiCapUsd, volumeCapUsd].filter(
+    (value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0
+  );
+  const notionalUsd = caps.length ? Math.min(...caps) : strategyFilters.plannedNotionalUsd;
   const usableNotionalUsd = notionalUsd ?? 0;
   const feeUsd = notionalUsd === null ? null : usableNotionalUsd * feeImpact.roundTripFeeRate;
 
@@ -1136,6 +1148,15 @@ function calculatePositionSuggestion(opportunity: FundingOpportunity, feeImpact:
     pnlDayUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod * 3 - (feeUsd ?? 0),
     pnl30dUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod * 90 - (feeUsd ?? 0)
   };
+}
+
+function getVolumeCapUsd(opportunity: FundingOpportunity, strategyFilters: StrategyFilters) {
+  if (strategyFilters.minVolumeMultiplier <= 0) return null;
+  const minVolume = getMinPairValue(
+    opportunity.longMarket?.volume24hUsd ?? null,
+    opportunity.shortMarket?.volume24hUsd ?? null
+  );
+  return minVolume === null ? null : minVolume / strategyFilters.minVolumeMultiplier;
 }
 
 function calculateFeeImpact(opportunity: FundingOpportunity, feeConfig: FeeConfig): FeeImpact {
