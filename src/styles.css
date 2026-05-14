@@ -212,8 +212,8 @@ h1 {
 
 .feePanel {
   display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) repeat(5, minmax(112px, 0.7fr));
-  align-items: end;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(320px, 1.3fr) minmax(280px, 1fr);
+  align-items: stretch;
   gap: 12px;
   margin: 0 0 18px;
   padding: 14px;
@@ -222,8 +222,9 @@ h1 {
   background: var(--surface);
 }
 
-.feePanel > div:first-child {
+.feeIntro {
   display: grid;
+  align-content: center;
   gap: 4px;
 }
 
@@ -234,6 +235,62 @@ h1 {
 .feePanel small {
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.exchangeFeeTabs,
+.exchangeFeeEditor {
+  display: grid;
+  gap: 8px;
+}
+
+.exchangeFeeTabs {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.exchangeFeeButton {
+  display: grid;
+  gap: 2px;
+  min-height: 58px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface-soft);
+  cursor: pointer;
+  text-align: left;
+}
+
+.exchangeFeeButton.active {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.exchangeFeeButton strong {
+  font-size: 0.86rem;
+}
+
+.exchangeFeeButton small {
+  overflow-wrap: anywhere;
+}
+
+.exchangeFeeEditor {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: stretch;
+}
+
+.feeReadout {
+  display: grid;
+  align-content: center;
+  min-width: 112px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.feeReadout span {
+  color: var(--muted);
+  font-size: 0.76rem;
 }
 
 .searchBox,
@@ -725,7 +782,12 @@ h1 {
 
   .marketGrid,
   .pnlGrid,
-  .legGrid {
+  .legGrid,
+  .exchangeFeeEditor {
     grid-template-columns: 1fr;
+  }
+
+  .exchangeFeeTabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

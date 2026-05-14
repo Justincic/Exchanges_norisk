@@ -11,15 +11,27 @@ type Language = 'en' | 'zh-TW' | 'zh-CN';
 type Theme = 'light' | 'dark';
 type FeeSide = 'maker' | 'taker';
 type VipLevel = 'VIP0' | 'VIP1' | 'VIP2' | 'VIP3' | 'VIP4' | 'VIP5';
-type FeeConfig = {
+type ExchangeFeeConfig = {
   side: FeeSide;
   discountPct: number;
-  vipByExchange: Record<'BN' | 'OKX' | 'Aster', VipLevel>;
+  vipLevel: VipLevel;
+};
+type FeeConfig = {
+  byExchange: Record<ExchangeId, ExchangeFeeConfig>;
 };
 
 const EXCHANGES: ExchangeId[] = ['HL', 'Lighter', 'OKX', 'BN', 'Aster'];
 const CEX_EXCHANGES = ['BN', 'OKX', 'Aster'] as const;
 const VIP_LEVELS: VipLevel[] = ['VIP0', 'VIP1', 'VIP2', 'VIP3', 'VIP4', 'VIP5'];
+const DEFAULT_FEE_CONFIG: FeeConfig = {
+  byExchange: {
+    HL: { side: 'taker', discountPct: 0, vipLevel: 'VIP0' },
+    Lighter: { side: 'taker', discountPct: 0, vipLevel: 'VIP0' },
+    OKX: { side: 'taker', discountPct: 0, vipLevel: 'VIP0' },
+    BN: { side: 'taker', discountPct: 0, vipLevel: 'VIP0' },
+    Aster: { side: 'taker', discountPct: 0, vipLevel: 'VIP0' }
+  }
+};
 const FEE_RATES: Record<ExchangeId, Record<VipLevel, Record<FeeSide, number>>> = {
   HL: makeFlatFees(0.0001, 0.00035),
   Lighter: makeFlatFees(0, 0.0002),
@@ -70,12 +82,14 @@ const COPY = {
     maker: 'Maker',
     taker: 'Taker',
     feeDiscount: 'Fee discount %',
+    effectiveFee: 'Effective fee',
     netSpread: 'Net spread',
     grossSpread: 'Gross spread',
     roundTripFee: 'Round-trip fee',
     breakEven: 'Break-even',
     fundingRounds: 'funding rounds',
     feePresetNote: 'Fee presets are editable assumptions: CEX VIP changes base maker/taker rate, discount applies after VIP.',
+    selectExchangeFee: 'Select an exchange above to tune execution fee assumptions.',
     sort: 'Sort',
     bestSpreadSort: 'Best spread',
     symbol: 'Symbol',
@@ -153,12 +167,14 @@ const COPY = {
     maker: 'Maker',
     taker: 'Taker',
     feeDiscount: '手續費減免 %',
+    effectiveFee: '實際費率',
     netSpread: '淨價差',
     grossSpread: '毛價差',
     roundTripFee: '進出場手續費',
     breakEven: '回本',
     fundingRounds: '次資金結算',
     feePresetNote: '手續費為可調預設：CEX VIP 會改 maker/taker 基準費率，減免 % 會再套用一次。',
+    selectExchangeFee: '點上方交易所按鈕，分別調整各家的成交手續費假設。',
     sort: '排序',
     bestSpreadSort: '最佳價差',
     symbol: '標的',
@@ -236,12 +252,14 @@ const COPY = {
     maker: 'Maker',
     taker: 'Taker',
     feeDiscount: '手续费减免 %',
+    effectiveFee: '实际费率',
     netSpread: '净价差',
     grossSpread: '毛价差',
     roundTripFee: '进出场手续费',
     breakEven: '回本',
     fundingRounds: '次资金结算',
     feePresetNote: '手续费为可调预设：CEX VIP 会改 maker/taker 基准费率，减免 % 会再套用一次。',
+    selectExchangeFee: '点上方交易所按钮，分别调整各家的成交手续费假设。',
     sort: '排序',
     bestSpreadSort: '最佳价差',
     symbol: '标的',
@@ -315,15 +333,8 @@ function App() {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = React.useState(false);
   const [sizingOpportunity, setSizingOpportunity] = React.useState<FundingOpportunity | null>(null);
-  const [feeConfig, setFeeConfig] = React.useState<FeeConfig>({
-    side: 'taker',
-    discountPct: 0,
-    vipByExchange: {
-      BN: 'VIP0',
-      OKX: 'VIP0',
-      Aster: 'VIP0'
-    }
-  });
+  const [feeConfig, setFeeConfig] = React.useState<FeeConfig>(DEFAULT_FEE_CONFIG);
+  const [activeFeeExchange, setActiveFeeExchange] = React.useState<ExchangeId>('BN');
   const t = COPY[language];
 
   const loadSnapshot = React.useCallback(async (forceRefresh = false) => {
@@ -355,7 +366,7 @@ function App() {
   const opportunities = React.useMemo(() => {
     const rows = filterMixedQuotes(snapshot?.opportunities ?? [], includeMixedQuotes)
       .filter((opportunity) => opportunity.baseSymbol.includes(query.trim().toUpperCase()))
-      .filter((opportunity) => calculateFeeImpact(opportunity, feeConfig).netAnnualized * 100 >= minApr)
+      .filter((opportunity) => minApr <= 0 || calculateFeeImpact(opportunity, feeConfig).netAnnualized * 100 >= minApr)
       .filter((opportunity) => (opportunity.minLiquidityUsd ?? 0) >= minLiquidityUsd);
 
     return sortOpportunities(rows, sortKey, feeConfig);
@@ -442,51 +453,32 @@ function App() {
       </section>
 
       <section className="feePanel" aria-label={t.feeSettings}>
-        <div>
+        <div className="feeIntro">
           <strong>{t.feeSettings}</strong>
           <small>{t.feePresetNote}</small>
         </div>
-        <label className="field compactField">
-          <span>{t.feeSide}</span>
-          <select
-            value={feeConfig.side}
-            onChange={(event) => setFeeConfig((current) => ({ ...current, side: event.target.value as FeeSide }))}
-          >
-            <option value="maker">{t.maker}</option>
-            <option value="taker">{t.taker}</option>
-          </select>
-        </label>
-        <label className="field compactField">
-          <span>{t.feeDiscount}</span>
-          <input
-            type="number"
-            min="0"
-            max="100"
-            step="1"
-            value={feeConfig.discountPct}
-            onChange={(event) =>
-              setFeeConfig((current) => ({ ...current, discountPct: clampNumber(Number(event.target.value), 0, 100) }))
-            }
-          />
-        </label>
-        {CEX_EXCHANGES.map((exchange) => (
-          <label className="field compactField" key={exchange}>
-            <span>{exchange} VIP</span>
-            <select
-              value={feeConfig.vipByExchange[exchange]}
-              onChange={(event) =>
-                setFeeConfig((current) => ({
-                  ...current,
-                  vipByExchange: { ...current.vipByExchange, [exchange]: event.target.value as VipLevel }
-                }))
-              }
-            >
-              {VIP_LEVELS.map((level) => (
-                <option value={level} key={level}>{level}</option>
-              ))}
-            </select>
-          </label>
-        ))}
+        <div className="exchangeFeeTabs">
+          {EXCHANGES.map((exchange) => {
+            const exchangeFee = feeConfig.byExchange[exchange];
+            return (
+              <button
+                className={activeFeeExchange === exchange ? 'exchangeFeeButton active' : 'exchangeFeeButton'}
+                key={exchange}
+                type="button"
+                onClick={() => setActiveFeeExchange(exchange)}
+              >
+                <strong>{exchange}</strong>
+                <small>{formatPercent(getEffectiveFeeRate(exchange, feeConfig))} / {exchangeFee.side}</small>
+              </button>
+            );
+          })}
+        </div>
+        <ExchangeFeeEditor
+          exchange={activeFeeExchange}
+          feeConfig={feeConfig}
+          setFeeConfig={setFeeConfig}
+          t={t}
+        />
       </section>
 
       <section className="controls">
@@ -580,6 +572,72 @@ function Metric({ label, value, helper }: { label: string; value: string; helper
       <span>{label}</span>
       <strong>{value}</strong>
       <small>{helper}</small>
+    </div>
+  );
+}
+
+function ExchangeFeeEditor({
+  exchange,
+  feeConfig,
+  setFeeConfig,
+  t
+}: {
+  exchange: ExchangeId;
+  feeConfig: FeeConfig;
+  setFeeConfig: React.Dispatch<React.SetStateAction<FeeConfig>>;
+  t: (typeof COPY)[Language];
+}) {
+  const exchangeFee = feeConfig.byExchange[exchange];
+  const isCex = isCexExchange(exchange);
+
+  return (
+    <div className="exchangeFeeEditor">
+      <label className="field compactField">
+        <span>{exchange} {t.feeSide}</span>
+        <select
+          value={exchangeFee.side}
+          onChange={(event) =>
+            setFeeConfig((current) => updateExchangeFee(current, exchange, { side: event.target.value as FeeSide }))
+          }
+        >
+          <option value="maker">{t.maker}</option>
+          <option value="taker">{t.taker}</option>
+        </select>
+      </label>
+      <label className="field compactField">
+        <span>{exchange} {t.feeDiscount}</span>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          step="1"
+          value={exchangeFee.discountPct}
+          onChange={(event) =>
+            setFeeConfig((current) =>
+              updateExchangeFee(current, exchange, { discountPct: clampNumber(Number(event.target.value), 0, 100) })
+            )
+          }
+        />
+      </label>
+      {isCex ? (
+        <label className="field compactField">
+          <span>{exchange} VIP</span>
+          <select
+            value={exchangeFee.vipLevel}
+            onChange={(event) =>
+              setFeeConfig((current) => updateExchangeFee(current, exchange, { vipLevel: event.target.value as VipLevel }))
+            }
+          >
+            {VIP_LEVELS.map((level) => (
+              <option value={level} key={level}>{level}</option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+      <div className="feeReadout">
+        <span>{t.effectiveFee}</span>
+        <strong>{formatPercent(getEffectiveFeeRate(exchange, feeConfig))}</strong>
+      </div>
     </div>
   );
 }
@@ -915,11 +973,26 @@ function calculateFeeImpact(opportunity: FundingOpportunity, feeConfig: FeeConfi
 
 function getEffectiveFeeRate(exchange: ExchangeId | null, feeConfig: FeeConfig) {
   if (!exchange) return 0;
-  const vip = exchange === 'BN' || exchange === 'OKX' || exchange === 'Aster'
-    ? feeConfig.vipByExchange[exchange]
-    : 'VIP0';
-  const baseFee = FEE_RATES[exchange][vip][feeConfig.side];
-  return baseFee * (1 - clampNumber(feeConfig.discountPct, 0, 100) / 100);
+  const exchangeFee = feeConfig.byExchange[exchange];
+  const vip = isCexExchange(exchange) ? exchangeFee.vipLevel : 'VIP0';
+  const baseFee = FEE_RATES[exchange][vip][exchangeFee.side];
+  return baseFee * (1 - clampNumber(exchangeFee.discountPct, 0, 100) / 100);
+}
+
+function updateExchangeFee(feeConfig: FeeConfig, exchange: ExchangeId, patch: Partial<ExchangeFeeConfig>): FeeConfig {
+  return {
+    byExchange: {
+      ...feeConfig.byExchange,
+      [exchange]: {
+        ...feeConfig.byExchange[exchange],
+        ...patch
+      }
+    }
+  };
+}
+
+function isCexExchange(exchange: ExchangeId): exchange is (typeof CEX_EXCHANGES)[number] {
+  return (CEX_EXCHANGES as readonly ExchangeId[]).includes(exchange);
 }
 
 function makeFlatFees(maker: number, taker: number): Record<VipLevel, Record<FeeSide, number>> {
