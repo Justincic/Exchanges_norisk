@@ -9,10 +9,49 @@ const REFRESH_MS = 60_000;
 type SortKey = 'spread' | 'symbol' | 'fundingTime' | 'freshness';
 type Language = 'en' | 'zh-TW' | 'zh-CN';
 type Theme = 'light' | 'dark';
+type FeeSide = 'maker' | 'taker';
+type VipLevel = 'VIP0' | 'VIP1' | 'VIP2' | 'VIP3' | 'VIP4' | 'VIP5';
+type FeeConfig = {
+  side: FeeSide;
+  discountPct: number;
+  vipByExchange: Record<'BN' | 'OKX' | 'Aster', VipLevel>;
+};
+
+const EXCHANGES: ExchangeId[] = ['HL', 'Lighter', 'OKX', 'BN', 'Aster'];
+const CEX_EXCHANGES = ['BN', 'OKX', 'Aster'] as const;
+const VIP_LEVELS: VipLevel[] = ['VIP0', 'VIP1', 'VIP2', 'VIP3', 'VIP4', 'VIP5'];
+const FEE_RATES: Record<ExchangeId, Record<VipLevel, Record<FeeSide, number>>> = {
+  HL: makeFlatFees(0.0001, 0.00035),
+  Lighter: makeFlatFees(0, 0.0002),
+  OKX: {
+    VIP0: { maker: 0.0002, taker: 0.0005 },
+    VIP1: { maker: 0.00018, taker: 0.00045 },
+    VIP2: { maker: 0.00016, taker: 0.0004 },
+    VIP3: { maker: 0.00014, taker: 0.00035 },
+    VIP4: { maker: 0.00012, taker: 0.0003 },
+    VIP5: { maker: 0.0001, taker: 0.00025 }
+  },
+  BN: {
+    VIP0: { maker: 0.0002, taker: 0.0005 },
+    VIP1: { maker: 0.00016, taker: 0.0004 },
+    VIP2: { maker: 0.00014, taker: 0.00035 },
+    VIP3: { maker: 0.00012, taker: 0.00032 },
+    VIP4: { maker: 0.0001, taker: 0.0003 },
+    VIP5: { maker: 0.00008, taker: 0.00027 }
+  },
+  Aster: {
+    VIP0: { maker: 0.0002, taker: 0.0005 },
+    VIP1: { maker: 0.00016, taker: 0.0004 },
+    VIP2: { maker: 0.00014, taker: 0.00035 },
+    VIP3: { maker: 0.00012, taker: 0.00032 },
+    VIP4: { maker: 0.0001, taker: 0.0003 },
+    VIP5: { maker: 0.00008, taker: 0.00027 }
+  }
+};
 
 const COPY = {
   en: {
-    eyebrow: 'HL / Lighter / OKX / BN perpetual funding monitor',
+    eyebrow: 'HL / Lighter / OKX / BN / Aster perpetual funding monitor',
     title: 'Funding Arbitrage',
     refreshData: 'Refresh funding data',
     bestSpread: 'Best spread',
@@ -26,6 +65,17 @@ const COPY = {
     search: 'Search BTC, WTI, TSLA...',
     minApr: 'Min APR spread',
     minLiquidityFilter: 'Min liquidity',
+    feeSettings: 'Fee settings',
+    feeSide: 'Execution',
+    maker: 'Maker',
+    taker: 'Taker',
+    feeDiscount: 'Fee discount %',
+    netSpread: 'Net spread',
+    grossSpread: 'Gross spread',
+    roundTripFee: 'Round-trip fee',
+    breakEven: 'Break-even',
+    fundingRounds: 'funding rounds',
+    feePresetNote: 'Fee presets are editable assumptions: CEX VIP changes base maker/taker rate, discount applies after VIP.',
     sort: 'Sort',
     bestSpreadSort: 'Best spread',
     symbol: 'Symbol',
@@ -84,7 +134,7 @@ const COPY = {
     minutesAgo: 'm ago'
   },
   'zh-TW': {
-    eyebrow: 'HL / Lighter / OKX / BN 永續資金費率監控',
+    eyebrow: 'HL / Lighter / OKX / BN / Aster 永續資金費率監控',
     title: '資金費率套利',
     refreshData: '刷新資金費率資料',
     bestSpread: '最佳價差',
@@ -98,6 +148,17 @@ const COPY = {
     search: '搜尋 BTC, WTI, TSLA...',
     minApr: '最低年化價差',
     minLiquidityFilter: '最低流動性',
+    feeSettings: '手續費設定',
+    feeSide: '成交方式',
+    maker: 'Maker',
+    taker: 'Taker',
+    feeDiscount: '手續費減免 %',
+    netSpread: '淨價差',
+    grossSpread: '毛價差',
+    roundTripFee: '進出場手續費',
+    breakEven: '回本',
+    fundingRounds: '次資金結算',
+    feePresetNote: '手續費為可調預設：CEX VIP 會改 maker/taker 基準費率，減免 % 會再套用一次。',
     sort: '排序',
     bestSpreadSort: '最佳價差',
     symbol: '標的',
@@ -156,7 +217,7 @@ const COPY = {
     minutesAgo: '分鐘前'
   },
   'zh-CN': {
-    eyebrow: 'HL / Lighter / OKX / BN 永续资金费率监控',
+    eyebrow: 'HL / Lighter / OKX / BN / Aster 永续资金费率监控',
     title: '资金费率套利',
     refreshData: '刷新资金费率数据',
     bestSpread: '最佳价差',
@@ -170,6 +231,17 @@ const COPY = {
     search: '搜索 BTC, WTI, TSLA...',
     minApr: '最低年化价差',
     minLiquidityFilter: '最低流动性',
+    feeSettings: '手续费设置',
+    feeSide: '成交方式',
+    maker: 'Maker',
+    taker: 'Taker',
+    feeDiscount: '手续费减免 %',
+    netSpread: '净价差',
+    grossSpread: '毛价差',
+    roundTripFee: '进出场手续费',
+    breakEven: '回本',
+    fundingRounds: '次资金结算',
+    feePresetNote: '手续费为可调预设：CEX VIP 会改 maker/taker 基准费率，减免 % 会再套用一次。',
     sort: '排序',
     bestSpreadSort: '最佳价差',
     symbol: '标的',
@@ -243,6 +315,15 @@ function App() {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = React.useState(false);
   const [sizingOpportunity, setSizingOpportunity] = React.useState<FundingOpportunity | null>(null);
+  const [feeConfig, setFeeConfig] = React.useState<FeeConfig>({
+    side: 'taker',
+    discountPct: 0,
+    vipByExchange: {
+      BN: 'VIP0',
+      OKX: 'VIP0',
+      Aster: 'VIP0'
+    }
+  });
   const t = COPY[language];
 
   const loadSnapshot = React.useCallback(async (forceRefresh = false) => {
@@ -274,13 +355,14 @@ function App() {
   const opportunities = React.useMemo(() => {
     const rows = filterMixedQuotes(snapshot?.opportunities ?? [], includeMixedQuotes)
       .filter((opportunity) => opportunity.baseSymbol.includes(query.trim().toUpperCase()))
-      .filter((opportunity) => opportunity.spreadAnnualized * 100 >= minApr)
+      .filter((opportunity) => calculateFeeImpact(opportunity, feeConfig).netAnnualized * 100 >= minApr)
       .filter((opportunity) => (opportunity.minLiquidityUsd ?? 0) >= minLiquidityUsd);
 
-    return sortOpportunities(rows, sortKey);
-  }, [includeMixedQuotes, minApr, minLiquidityUsd, query, snapshot, sortKey]);
+    return sortOpportunities(rows, sortKey, feeConfig);
+  }, [feeConfig, includeMixedQuotes, minApr, minLiquidityUsd, query, snapshot, sortKey]);
 
   const topOpportunity = opportunities[0];
+  const topFeeImpact = topOpportunity ? calculateFeeImpact(topOpportunity, feeConfig) : null;
 
   return (
     <main className="shell">
@@ -335,8 +417,8 @@ function App() {
       <section className="summaryBand">
         <Metric
           label={t.bestSpread}
-          value={topOpportunity ? formatPercent(topOpportunity.spreadAnnualized) : '--'}
-          helper={topOpportunity ? `${topOpportunity.baseSymbol} ${t.annualized}` : t.waiting}
+          value={topFeeImpact ? formatPercent(topFeeImpact.netAnnualized) : '--'}
+          helper={topOpportunity ? `${topOpportunity.baseSymbol} ${t.netSpread}` : t.waiting}
         />
         <Metric
           label={t.markets}
@@ -349,7 +431,7 @@ function App() {
           helper={snapshot ? `${t.updated} ${formatRelativeTime(snapshot.generatedAt, t)}` : t.notLoaded}
         />
         <div className="healthStrip">
-          {(snapshot?.health ?? (['HL', 'Lighter', 'OKX', 'BN'] as ExchangeId[]).map((exchange) => ({ exchange, ok: false, lastUpdatedAt: null }))).map(
+          {(snapshot?.health ?? EXCHANGES.map((exchange) => ({ exchange, ok: false, lastUpdatedAt: null }))).map(
             (item) => (
               <span className={item.ok ? 'health ok' : 'health bad'} key={item.exchange}>
                 {item.exchange}
@@ -357,6 +439,54 @@ function App() {
             )
           )}
         </div>
+      </section>
+
+      <section className="feePanel" aria-label={t.feeSettings}>
+        <div>
+          <strong>{t.feeSettings}</strong>
+          <small>{t.feePresetNote}</small>
+        </div>
+        <label className="field compactField">
+          <span>{t.feeSide}</span>
+          <select
+            value={feeConfig.side}
+            onChange={(event) => setFeeConfig((current) => ({ ...current, side: event.target.value as FeeSide }))}
+          >
+            <option value="maker">{t.maker}</option>
+            <option value="taker">{t.taker}</option>
+          </select>
+        </label>
+        <label className="field compactField">
+          <span>{t.feeDiscount}</span>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            value={feeConfig.discountPct}
+            onChange={(event) =>
+              setFeeConfig((current) => ({ ...current, discountPct: clampNumber(Number(event.target.value), 0, 100) }))
+            }
+          />
+        </label>
+        {CEX_EXCHANGES.map((exchange) => (
+          <label className="field compactField" key={exchange}>
+            <span>{exchange} VIP</span>
+            <select
+              value={feeConfig.vipByExchange[exchange]}
+              onChange={(event) =>
+                setFeeConfig((current) => ({
+                  ...current,
+                  vipByExchange: { ...current.vipByExchange, [exchange]: event.target.value as VipLevel }
+                }))
+              }
+            >
+              {VIP_LEVELS.map((level) => (
+                <option value={level} key={level}>{level}</option>
+              ))}
+            </select>
+          </label>
+        ))}
       </section>
 
       <section className="controls">
@@ -422,6 +552,7 @@ function App() {
               key={opportunity.baseSymbol}
               opportunity={opportunity}
               t={t}
+              feeImpact={calculateFeeImpact(opportunity, feeConfig)}
               onSuggestPosition={setSizingOpportunity}
             />
           ))}
@@ -435,6 +566,7 @@ function App() {
         <PositionSuggestionModal
           opportunity={sizingOpportunity}
           t={t}
+          feeImpact={calculateFeeImpact(sizingOpportunity, feeConfig)}
           onClose={() => setSizingOpportunity(null)}
         />
       ) : null}
@@ -455,10 +587,12 @@ function Metric({ label, value, helper }: { label: string; value: string; helper
 function OpportunityRow({
   opportunity,
   t,
+  feeImpact,
   onSuggestPosition
 }: {
   opportunity: FundingOpportunity;
   t: (typeof COPY)[Language];
+  feeImpact: FeeImpact;
   onSuggestPosition: (opportunity: FundingOpportunity) => void;
 }) {
   return (
@@ -487,9 +621,16 @@ function OpportunityRow({
           </span>
         </div>
         <div className="spreadLine">
-          <strong>{formatPercent(opportunity.spreadAnnualized)}</strong>
-          <span>{t.aprSpread}</span>
-          <span>{formatPercent(opportunity.spreadPerPeriod)} {t.eightHourEquiv}</span>
+          <strong className={feeImpact.netAnnualized >= 0 ? 'positive' : 'negative'}>
+            {formatPercent(feeImpact.netAnnualized)}
+          </strong>
+          <span>{t.netSpread}</span>
+          <span>{formatPercent(feeImpact.netPerPeriod)} {t.eightHourEquiv}</span>
+        </div>
+        <div className="riskLine">
+          <span>{t.grossSpread} {formatPercent(opportunity.spreadAnnualized)}</span>
+          <span>{t.roundTripFee} {formatPercent(feeImpact.roundTripFeeRate)}</span>
+          <span>{t.breakEven} {formatBreakEven(feeImpact.breakEvenPeriods, t)}</span>
         </div>
         <div className="timeLine">
           <Clock3 size={14} />
@@ -513,7 +654,7 @@ function OpportunityRow({
       </div>
 
       <div className="marketGrid">
-        {(['HL', 'Lighter', 'OKX', 'BN'] as ExchangeId[]).map((exchange) => (
+        {EXCHANGES.map((exchange) => (
           <ExchangeColumn
             key={exchange}
             exchange={exchange}
@@ -529,13 +670,15 @@ function OpportunityRow({
 function PositionSuggestionModal({
   opportunity,
   t,
+  feeImpact,
   onClose
 }: {
   opportunity: FundingOpportunity;
   t: (typeof COPY)[Language];
+  feeImpact: FeeImpact;
   onClose: () => void;
 }) {
-  const sizing = calculatePositionSuggestion(opportunity);
+  const sizing = calculatePositionSuggestion(opportunity, feeImpact);
 
   return (
     <div className="modalBackdrop" role="presentation" onClick={onClose}>
@@ -557,9 +700,9 @@ function PositionSuggestionModal({
         </div>
 
         <div className="pnlGrid">
-          <Metric label={`${t.estimatedPnl} ${t.per8h}`} value={formatUsdFull(sizing.pnl8hUsd)} helper={formatPercent(opportunity.spreadPerPeriod)} />
-          <Metric label={`${t.estimatedPnl} ${t.perDay}`} value={formatUsdFull(sizing.pnlDayUsd)} helper={formatPercent(opportunity.spreadPerPeriod * 3)} />
-          <Metric label={`${t.estimatedPnl} ${t.per30d}`} value={formatUsdFull(sizing.pnl30dUsd)} helper={formatPercent(opportunity.spreadPerPeriod * 90)} />
+          <Metric label={`${t.estimatedPnl} ${t.per8h}`} value={formatUsdFull(sizing.pnl8hUsd)} helper={`${t.netSpread} ${formatPercent(feeImpact.netPerPeriod)}`} />
+          <Metric label={`${t.estimatedPnl} ${t.perDay}`} value={formatUsdFull(sizing.pnlDayUsd)} helper={`${t.roundTripFee} ${formatUsdFull(sizing.feeUsd)}`} />
+          <Metric label={`${t.estimatedPnl} ${t.per30d}`} value={formatUsdFull(sizing.pnl30dUsd)} helper={`${t.breakEven} ${formatBreakEven(feeImpact.breakEvenPeriods, t)}`} />
         </div>
 
         <div className="legGrid">
@@ -640,12 +783,12 @@ function ExchangeColumn({
   );
 }
 
-function sortOpportunities(rows: FundingOpportunity[], sortKey: SortKey) {
+function sortOpportunities(rows: FundingOpportunity[], sortKey: SortKey, feeConfig: FeeConfig) {
   return [...rows].sort((a, b) => {
     if (sortKey === 'symbol') return a.baseSymbol.localeCompare(b.baseSymbol);
     if (sortKey === 'fundingTime') return (a.nextFundingTime ?? Infinity) - (b.nextFundingTime ?? Infinity);
     if (sortKey === 'freshness') return newestSource(b) - newestSource(a);
-    return b.spreadAnnualized - a.spreadAnnualized;
+    return calculateFeeImpact(b, feeConfig).netAnnualized - calculateFeeImpact(a, feeConfig).netAnnualized;
   });
 }
 
@@ -728,18 +871,72 @@ function clampRate(value: number) {
   return Math.max(-1, Math.min(1, value * 10));
 }
 
-function calculatePositionSuggestion(opportunity: FundingOpportunity) {
+type FeeImpact = {
+  longFeeRate: number;
+  shortFeeRate: number;
+  roundTripFeeRate: number;
+  netPerPeriod: number;
+  netAnnualized: number;
+  breakEvenPeriods: number | null;
+};
+
+function calculatePositionSuggestion(opportunity: FundingOpportunity, feeImpact: FeeImpact) {
   const basisUsd = getSizingBasisUsd(opportunity.longMarket, opportunity.shortMarket);
   const notionalUsd = basisUsd === null ? null : Math.min(50_000, Math.max(0, basisUsd * 0.02));
   const usableNotionalUsd = notionalUsd ?? 0;
+  const feeUsd = notionalUsd === null ? null : usableNotionalUsd * feeImpact.roundTripFeeRate;
 
   return {
     basisUsd,
     notionalUsd,
-    pnl8hUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod,
-    pnlDayUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod * 3,
-    pnl30dUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod * 90
+    feeUsd,
+    pnl8hUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod - (feeUsd ?? 0),
+    pnlDayUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod * 3 - (feeUsd ?? 0),
+    pnl30dUsd: notionalUsd === null ? null : usableNotionalUsd * opportunity.spreadPerPeriod * 90 - (feeUsd ?? 0)
   };
+}
+
+function calculateFeeImpact(opportunity: FundingOpportunity, feeConfig: FeeConfig): FeeImpact {
+  const longFeeRate = getEffectiveFeeRate(opportunity.longMarket?.exchange ?? null, feeConfig);
+  const shortFeeRate = getEffectiveFeeRate(opportunity.shortMarket?.exchange ?? null, feeConfig);
+  const roundTripFeeRate = 2 * (longFeeRate + shortFeeRate);
+  const netPerPeriod = opportunity.spreadPerPeriod - roundTripFeeRate;
+  const breakEvenPeriods = opportunity.spreadPerPeriod > 0 ? roundTripFeeRate / opportunity.spreadPerPeriod : null;
+
+  return {
+    longFeeRate,
+    shortFeeRate,
+    roundTripFeeRate,
+    netPerPeriod,
+    netAnnualized: netPerPeriod * 365 * 3,
+    breakEvenPeriods
+  };
+}
+
+function getEffectiveFeeRate(exchange: ExchangeId | null, feeConfig: FeeConfig) {
+  if (!exchange) return 0;
+  const vip = exchange === 'BN' || exchange === 'OKX' || exchange === 'Aster'
+    ? feeConfig.vipByExchange[exchange]
+    : 'VIP0';
+  const baseFee = FEE_RATES[exchange][vip][feeConfig.side];
+  return baseFee * (1 - clampNumber(feeConfig.discountPct, 0, 100) / 100);
+}
+
+function makeFlatFees(maker: number, taker: number): Record<VipLevel, Record<FeeSide, number>> {
+  return Object.fromEntries(VIP_LEVELS.map((level) => [level, { maker, taker }])) as Record<
+    VipLevel,
+    Record<FeeSide, number>
+  >;
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
+}
+
+function formatBreakEven(value: number | null, t: (typeof COPY)[Language]) {
+  if (value === null) return '--';
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${t.fundingRounds}`;
 }
 
 function getSizingBasisUsd(longMarket: FundingMarket | null, shortMarket: FundingMarket | null) {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fetchBinanceMarkets, fetchHyperliquidMarkets, fetchLighterMarkets } from './exchanges';
+import { fetchAsterMarkets, fetchBinanceMarkets, fetchHyperliquidMarkets, fetchLighterMarkets } from './exchanges';
 
 describe('exchange adapters', () => {
   it('normalizes Hyperliquid core funding rows with price and liquidity', async () => {
@@ -176,6 +176,57 @@ describe('exchange adapters', () => {
       markPrice: 290.25,
       volume24hUsd: 12_000_000
     });
+    vi.unstubAllGlobals();
+  });
+
+  it('normalizes Aster perpetual rows', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('premiumIndex')) {
+          return {
+            ok: true,
+            json: async () => [
+              { symbol: 'TSLAUSDT', lastFundingRate: '0.00015', nextFundingTime: 1_800_000_000_000, markPrice: '420', indexPrice: '419' },
+              { symbol: 'GNSUSD', lastFundingRate: '-0.0002', nextFundingTime: 1_800_000_000_000, markPrice: '0.5', indexPrice: '0.5' },
+              { symbol: 'DELISTUSDT', lastFundingRate: '0.1', nextFundingTime: 1_800_000_000_000, markPrice: '1', indexPrice: '1' }
+            ]
+          };
+        }
+        if (url.includes('ticker/24hr')) {
+          return {
+            ok: true,
+            json: async () => [
+              { symbol: 'TSLAUSDT', quoteVolume: '9000000' },
+              { symbol: 'GNSUSD', quoteVolume: '100000' }
+            ]
+          };
+        }
+        if (url.includes('exchangeInfo')) {
+          return {
+            ok: true,
+            json: async () => ({
+              symbols: [
+                { symbol: 'TSLAUSDT', status: 'TRADING', contractType: 'PERPETUAL', quoteAsset: 'USDT' },
+                { symbol: 'GNSUSD', status: 'TRADING', contractType: 'PERPETUAL', quoteAsset: 'USD' },
+                { symbol: 'DELISTUSDT', status: 'BREAK', contractType: 'PERPETUAL', quoteAsset: 'USDT' }
+              ]
+            })
+          };
+        }
+        return {
+          ok: true,
+          json: async () => [{ symbol: 'TSLAUSDT', fundingIntervalHours: 1 }]
+        };
+      })
+    );
+
+    const result = await fetchAsterMarkets();
+
+    expect(result.health.ok).toBe(true);
+    expect(result.markets.map((market) => market.marketSymbol)).toEqual(['TSLAUSDT', 'GNSUSD']);
+    expect(result.markets.find((market) => market.marketSymbol === 'TSLAUSDT')?.intervalHours).toBe(1);
+    expect(result.markets.find((market) => market.marketSymbol === 'GNSUSD')?.quoteAsset).toBe('USD');
     vi.unstubAllGlobals();
   });
 });

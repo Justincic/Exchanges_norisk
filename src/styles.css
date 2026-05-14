@@ -210,6 +210,32 @@ h1 {
   margin: 18px 0;
 }
 
+.feePanel {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(5, minmax(112px, 0.7fr));
+  align-items: end;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.feePanel > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.feePanel strong {
+  font-size: 1rem;
+}
+
+.feePanel small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .searchBox,
 .field,
 .toggle {
@@ -354,6 +380,10 @@ h1 {
   color: var(--positive);
 }
 
+.spreadLine strong.negative {
+  color: var(--negative);
+}
+
 .spreadLine span,
 .timeLine {
   color: var(--muted);
@@ -403,7 +433,7 @@ h1 {
 
 .marketGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -673,6 +703,7 @@ h1 {
 @media (max-width: 1080px) {
   .summaryBand,
   .controls,
+  .feePanel,
   .tableHeader,
   .opportunityRow {
     grid-template-columns: 1fr;

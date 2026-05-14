@@ -12,7 +12,13 @@ export type ExchangeFetchResult = {
 };
 
 export async function fetchAllExchangeMarkets(): Promise<ExchangeFetchResult[]> {
-  return Promise.all([fetchHyperliquidMarkets(), fetchLighterMarkets(), fetchBinanceMarkets(), fetchOkxMarkets()]);
+  return Promise.all([
+    fetchHyperliquidMarkets(),
+    fetchLighterMarkets(),
+    fetchBinanceMarkets(),
+    fetchOkxMarkets(),
+    fetchAsterMarkets()
+  ]);
 }
 
 export async function fetchHyperliquidMarkets(): Promise<ExchangeFetchResult> {
@@ -150,6 +156,62 @@ export async function fetchBinanceMarkets(): Promise<ExchangeFetchResult> {
           });
         }
       )
+      .filter((market) => Number.isFinite(market.fundingRate));
+
+    return {
+      markets,
+      health: { exchange, ok: true, lastUpdatedAt: startedAt }
+    };
+  } catch (error) {
+    return failure(exchange, error);
+  }
+}
+
+export async function fetchAsterMarkets(): Promise<ExchangeFetchResult> {
+  const exchange: ExchangeId = 'Aster';
+  const startedAt = Date.now();
+  const baseUrl = 'https://fapi.asterdex.com/fapi/v1';
+
+  try {
+    const [premiumIndex, exchangeInfo, fundingInfo, tickers] = await Promise.all([
+      fetchJson<BinancePremiumIndex[] | BinancePremiumIndex>(`${baseUrl}/premiumIndex`),
+      fetchJson<BinanceExchangeInfo>(`${baseUrl}/exchangeInfo`),
+      fetchJson<BinanceFundingInfo[]>(`${baseUrl}/fundingInfo`).catch(() => []),
+      fetchJson<BinanceTicker24h[]>(`${baseUrl}/ticker/24hr`).catch(() => [])
+    ]);
+
+    const validSymbols = new Set(
+      exchangeInfo.symbols
+        .filter(
+          (symbol) =>
+            (symbol.contractType === 'PERPETUAL' || symbol.contractType === 'TRADIFI_PERPETUAL') &&
+            symbol.status === 'TRADING' &&
+            (symbol.quoteAsset === 'USDT' || symbol.quoteAsset === 'USDC' || symbol.quoteAsset === 'USD')
+        )
+        .map((symbol) => symbol.symbol)
+    );
+    const intervalBySymbol = new Map(
+      fundingInfo.map((item) => [item.symbol, Number(item.fundingIntervalHours) || 8])
+    );
+    const tickerBySymbol = new Map(tickers.map((ticker) => [ticker.symbol, ticker]));
+
+    const rows = Array.isArray(premiumIndex) ? premiumIndex : [premiumIndex];
+    const markets = rows
+      .filter((row) => validSymbols.has(row.symbol))
+      .map((row) => {
+        const ticker = tickerBySymbol.get(row.symbol);
+        return createFundingMarket({
+          marketSymbol: row.symbol,
+          exchange,
+          fundingRate: Number(row.lastFundingRate),
+          nextFundingTime: Number(row.nextFundingTime) || null,
+          intervalHours: intervalBySymbol.get(row.symbol) ?? 8,
+          markPrice: Number(row.markPrice),
+          indexPrice: Number(row.indexPrice),
+          volume24hUsd: Number(ticker?.quoteVolume),
+          sourceUpdatedAt: startedAt
+        });
+      })
       .filter((market) => Number.isFinite(market.fundingRate));
 
     return {
