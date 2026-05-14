@@ -70,6 +70,7 @@ select {
 .topbar,
 .summaryBand,
 .controls,
+.advancedPanel,
 .tableHeader,
 .opportunityRow {
   display: grid;
@@ -205,9 +206,38 @@ h1 {
 }
 
 .controls {
-  grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(130px, 0.7fr)) auto;
-  align-items: end;
+  grid-template-columns: minmax(260px, 1fr) minmax(130px, 0.28fr) minmax(150px, 0.34fr) auto auto;
+  align-items: stretch;
   margin: 18px 0;
+}
+
+.advancedToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface);
+  cursor: pointer;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.chevron {
+  transition: transform 0.18s ease;
+}
+
+.chevron.open {
+  transform: rotate(180deg);
+}
+
+.advancedPanel {
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .strategyPanel {
@@ -215,7 +245,7 @@ h1 {
   grid-template-columns: minmax(180px, 0.65fr) minmax(280px, 0.8fr) minmax(420px, 1.4fr);
   align-items: stretch;
   gap: 12px;
-  margin: 0 0 18px;
+  margin: 0;
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -270,7 +300,7 @@ h1 {
   grid-template-columns: minmax(220px, 0.9fr) minmax(320px, 1.3fr) minmax(280px, 1fr);
   align-items: stretch;
   gap: 12px;
-  margin: 0 0 18px;
+  margin: 0;
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -815,6 +845,7 @@ h1 {
 @media (max-width: 1080px) {
   .summaryBand,
   .controls,
+  .advancedPanel,
   .feePanel,
   .strategyPanel,
   .tableHeader,
